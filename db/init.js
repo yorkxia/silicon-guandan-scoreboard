@@ -226,6 +226,9 @@ async function initDB() {
   await query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS backup_partner_name_enc TEXT`);
   // 迁移：添加 payment_type 列（如果不存在）
   await query(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS payment_type TEXT DEFAULT 'Venmo'`);
+  // 迁移：掼蛋付款邮件确认 token + 激活天数
+  await query(`ALTER TABLE gd_payments ADD COLUMN IF NOT EXISTS confirm_token TEXT DEFAULT ''`);
+  await query(`ALTER TABLE gd_activations ADD COLUMN IF NOT EXISTS activation_days INTEGER DEFAULT 31`);
 
   // 默认 sb admin
   const sbAdminExists = await queryOne('SELECT id FROM sb_users WHERE username = $1', ['sbadmin']);
