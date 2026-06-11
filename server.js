@@ -7,6 +7,7 @@ const path = require('path');
 const { initDB } = require('./db/init');
 const scoreboardRoutes = require('./routes/scoreboard');
 const intelligenceRoutes = require('./routes/intelligence');
+const guandanAdminRoutes = require('./routes/guandan-admin');
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use((req, res, next) => {
 
 app.use('/scoreboard', scoreboardRoutes);
 app.use('/scoreboard/intelligence', intelligenceRoutes);
+app.use('/scoreboard/guandan-admin', guandanAdminRoutes);
 
 app.get('/', (req, res) => res.redirect('/scoreboard/login'));
 app.use((req, res) => res.redirect('/scoreboard/login'));

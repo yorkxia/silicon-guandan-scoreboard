@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>掼蛋管理 · 监控系统</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/scoreboard-admin.css">
+<style>
+/* ── Layout ── */
+.sb-layout { display: flex; min-height: 100vh; }
+.sb-main { flex: 1; padding: 28px 32px; overflow-x: auto; }
+.sb-page-title { font-size: 1.5rem; font-weight: 900; color: #D4AC0D; margin-bottom: 24px; }
+
+/* ── Tabs ── */
+.gd-tabs { display: flex; gap: 4px; border-bottom: 2px solid #333; margin-bottom: 24px; }
+.gd-tab {
+  padding: 10px 20px; cursor: pointer; font-size: 0.9rem; font-weight: 700;
+  color: #888; border: none; background: none; border-bottom: 3px solid transparent;
+  margin-bottom: -2px; transition: all 0.2s;
+}
+.gd-tab:hover { color: #D4AC0D; }
+.gd-tab.active { color: #D4AC0D; border-bottom-color: #D4AC0D; }
+.gd-panel { display: none; }
+.gd-panel.active { display: block; }
+
+/* ── Stats Cards ── */
+.gd-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+.gd-stat-card {
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border: 1px solid #333; border-radius: 12px; padding: 20px;
+  text-align: center;
+}
+.gd-stat-card .num { font-size: 2.4rem; font-weight: 900; color: #D4AC0D; line-height: 1; }
+.gd-stat-card .label { font-size: 0.78rem; color: #888; margin-top: 6px; }
+.gd-stat-card.pending .num { color: #FF9800; }
+.gd-stat-card.confirmed .num { color: #4CAF50; }
+.gd-stat-card.active-acts .num { color: #2196F3; }
+
+/* ── Tables ── */
+.gd-table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+th { background: #1a1a2e; color: #D4AC0D; padding: 10px 12px; text-align: left; white-space: nowrap; }
+td { padding: 9px 12px; border-bottom: 1px solid #222; color: #ccc; vertical-align: middle; }
+tr:hover td { background: rgba(255,255,255,0.03); }
+.section-title { font-size: 1rem; font-weight: 700; color: #ccc; margin: 0 0 12px; }
+
+/* ── Status Badges ── */
+.badge {
+  display: inline-block; padding: 3px 10px; border-radius: 20px;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.5px;
+}
+.badge-pending  { background: #332200; color: #FF9800; }
+.badge-confirmed { background: #0a2a0a; color: #4CAF50; }
+.badge-rejected  { background: #2a0a0a; color: #F44336; }
+.badge-active   { background: #0a1a2a; color: #2196F3; }
+.badge-expired  { background: #222; color: #666; }
+.badge-used     { background: #222; color: #999; }
+
+/* ── Buttons ── */
+.btn { display: inline-block; padding: 5px 12px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; border: none; transition: all 0.15s; }
+.btn-confirm { background: #1a4a1a; color: #4CAF50; border: 1px solid #2a6a2a; }
+.btn-confirm:hover { background: #2a6a2a; }
+.btn-reject  { background: #4a1a1a; color: #F44336; border: 1px solid #6a2a2a; }
+.btn-reject:hover  { background: #6a2a2a; }
+.btn-qr      { background: #1a2a4a; color: #2196F3; border: 1px solid #2a4a6a; }
+.btn-qr:hover      { background: #2a4a6a; }
+.btn-act     { background: #2a2a0a; color: #D4AC0D; border: 1px solid #4a4a1a; }
+.btn-act:hover     { background: #4a4a1a; }
+.btn-primary { background: #D4AC0D; color: #111; padding: 8px 20px; font-size: 0.9rem; }
+.btn-primary:hover { background: #e8c020; }
+
+/* ── Filter Buttons ── */
+.filter-bar { display: flex; gap: 8px; margin-bottom: 16px; }
+.filter-btn {
+  padding: 6px 16px; border-radius: 20px; font-size: 0.8rem; font-weight: 700;
+  cursor: pointer; border: 1px solid #444; background: #1a1a2e; color: #888;
+  transition: all 0.15s;
+}
+.filter-btn.active { background: #D4AC0D; color: #111; border-color: #D4AC0D; }
+.filter-btn:hover:not(.active) { color: #D4AC0D; border-color: #D4AC0D; }
+
+/* ── Generate Form ── */
+.gd-gen-form {
+  background: #1a1a2e; border: 1px solid #333; border-radius: 12px;
+  padding: 20px 24px; margin-bottom: 28px;
+}
+.gd-gen-form h3 { font-size: 0.95rem; color: #D4AC0D; margin-bottom: 16px; }
+.gd-form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+.gd-form-group { display: flex; flex-direction: column; gap: 5px; }
+.gd-form-group label { font-size: 0.75rem; color: #888; }
+.gd-form-group select,
+.gd-form-group input {
+  background: #111; border: 1px solid #444; color: #ccc; border-radius: 6px;
+  padding: 7px 10px; font-size: 0.83rem; min-width: 140px;
+}
+.gd-form-group select:focus,
+.gd-form-group input:focus { outline: none; border-color: #D4AC0D; }
+
+/* ── Notes input ── */
+.notes-input {
+  background: #111; border: 1px solid #333; color: #ccc; border-radius: 4px;
+  padding: 4px 8px; font-size: 0.78rem; width: 100%; max-width: 200px;
+}
+
+/* ── Modal ── */
+.gd-modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+  z-index: 1000; align-items: center; justify-content: center;
+}
+.gd-modal-overlay.open { display: flex; }
+.gd-modal {
+  background: #1a1a2e; border: 1px solid #444; border-radius: 16px;
+  padding: 28px 32px; max-width: 420px; width: 90%; text-align: center;
+  position: relative;
+}
+.gd-modal h3 { color: #D4AC0D; margin-bottom: 16px; font-size: 1.1rem; }
+.gd-modal img { max-width: 240px; border-radius: 8px; background: #fff; padding: 8px; margin: 8px 0; }
+.gd-modal .act-url {
+  font-size: 0.72rem; color: #888; word-break: break-all; margin: 8px 0;
+  background: #111; padding: 8px; border-radius: 6px;
+}
+.gd-modal .act-code { font-size: 0.78rem; color: #2196F3; font-family: monospace; margin: 6px 0; }
+.gd-modal .act-expiry { font-size: 0.78rem; color: #4CAF50; margin: 6px 0; }
+.gd-modal-close {
+  position: absolute; top: 12px; right: 14px; background: none; border: none;
+  color: #888; font-size: 1.2rem; cursor: pointer;
+}
+.gd-modal-close:hover { color: #fff; }
+
+/* ── Spinner ── */
+.spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #444; border-top-color: #D4AC0D; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .gd-stats { grid-template-columns: repeat(2, 1fr); }
+  .sb-main { padding: 16px; }
+  .gd-form-row { flex-direction: column; }
+}
+</style>
+</head>
+<body class="sb-body">
+<div class="sb-layout">
+  <%- include('_layout') %>
+  <main class="sb-main">
+    <div class="sb-page-title">🎴 掼蛋计分器系统管理</div>
+
+    <!-- Tab nav -->
+    <div class="gd-tabs">
+      <button class="gd-tab" data-tab="dashboard" onclick="gdTab('dashboard')">📊 仪表板</button>
+      <button class="gd-tab" data-tab="users" onclick="gdTab('users')">👤 用户管理</button>
+      <button class="gd-tab" data-tab="payments" onclick="gdTab('payments')">💰 付款记录</button>
+      <button class="gd-tab" data-tab="activations" onclick="gdTab('activations')">🔑 激活码管理</button>
+    </div>
+
+    <!-- ── 仪表板 ── -->
+    <div class="gd-panel" id="panel-dashboard">
+      <% if (stats) { %>
+      <div class="gd-stats">
+        <div class="gd-stat-card">
+          <div class="num"><%= stats.totalUsers %></div>
+          <div class="label">总用户数</div>
+        </div>
+        <div class="gd-stat-card pending">
+          <div class="num"><%= stats.pendingPayments %></div>
+          <div class="label">待确认付款</div>
+        </div>
+        <div class="gd-stat-card confirmed">
+          <div class="num"><%= stats.confirmedPayments %></div>
+          <div class="label">已确认付款</div>
+        </div>
+        <div class="gd-stat-card active-acts">
+          <div class="num"><%= stats.activeActivations %></div>
+          <div class="label">有效激活码</div>
+        </div>
+      </div>
+      <% } %>
+
+      <% if (recentPayments && recentPayments.length) { %>
+      <p class="section-title">最近付款记录</p>
+      <div class="gd-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>用户姓名</th><th>联系方式</th><th>金额</th>
+              <th>付款方式</th><th>提交时间</th><th>状态</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% recentPayments.forEach(function(p){ %>
+            <tr id="pay-row-<%= p.id %>">
+              <td><%= p.id %></td>
+              <td><%= p.user_name || '—' %></td>
+              <td><%= p.user_contact || '—' %></td>
+              <td><%= p.amount || '—' %> <%= p.currency %></td>
+              <td><%= p.payment_method %></td>
+              <td><%= p.created_at ? new Date(p.created_at).toLocaleString('zh-CN') : '—' %></td>
+              <td>
+                <span class="badge badge-<%= p.status %>">
+                  <%= p.status === 'pending' ? '待确认' : p.status === 'confirmed' ? '已确认' : '已拒绝' %>
+                </span>
+              </td>
+              <td>
+                <% if (p.status === 'pending') { %>
+                <button class="btn btn-confirm" onclick="confirmPayment(<%= p.id %>)">确认</button>
+                <button class="btn btn-reject"  onclick="rejectPayment(<%= p.id %>)">拒绝</button>
+                <% } else if (p.status === 'confirmed') { %>
+                <button class="btn btn-act" onclick="openCreateActModal(<%= p.id %>, <%= p.user_id || 'null' %>)">创建激活码</button>
+                <% } %>
+              </td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+
+      <% if (recentActivations && recentActivations.length) { %>
+      <p class="section-title" style="margin-top:28px">最近激活码</p>
+      <div class="gd-table-wrap">
+        <table>
+          <thead>
+            <tr><th>ID</th><th>用户</th><th>激活码</th><th>有效期至</th><th>状态</th><th>操作</th></tr>
+          </thead>
+          <tbody>
+            <% recentActivations.forEach(function(a){ %>
+            <tr>
+              <td><%= a.id %></td>
+              <td><%= a.user_name || '—' %></td>
+              <td style="font-family:monospace;font-size:0.72rem"><%= a.code.substring(0,12) %>...</td>
+              <td><%= a.valid_until ? new Date(a.valid_until).toLocaleDateString('zh-CN') : '—' %></td>
+              <td>
+                <% var now = new Date(); var expired = a.valid_until && new Date(a.valid_until) < now; %>
+                <span class="badge <%= expired ? 'badge-expired' : (a.is_used ? 'badge-used' : 'badge-active') %>">
+                  <%= expired ? '已过期' : (a.is_used ? '已使用' : '有效') %>
+                </span>
+              </td>
+              <td><button class="btn btn-qr" onclick="viewQR(<%= a.id %>)">查看QR码</button></td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </div>
+
+    <!-- ── 用户管理 ── -->
+    <div class="gd-panel" id="panel-users">
+      <div class="gd-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>姓名</th><th>联系方式</th><th>设备ID</th><th>设备信息</th>
+              <th>安装时间</th><th>最后访问</th><th>付款次数</th><th>最新激活到期</th><th>备注</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (typeof users !== 'undefined' && users) { %>
+            <% users.forEach(function(u){ %>
+            <tr>
+              <td><%= u.id %></td>
+              <td><%= u.name %></td>
+              <td><%= u.contact || '—' %></td>
+              <td style="font-family:monospace;font-size:0.72rem">
+                <%= u.device_id ? u.device_id.substring(0,8) + '...' : '—' %>
+              </td>
+              <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<%= u.device_info || '' %>">
+                <%= u.device_info ? u.device_info.substring(0,30) + (u.device_info.length > 30 ? '...' : '') : '—' %>
+              </td>
+              <td>
+                <% if (u.install_ts && u.install_ts > 0) { %>
+                  <%= new Date(parseInt(u.install_ts)).toLocaleDateString('zh-CN') %>
+                <% } else { %>—<% } %>
+              </td>
+              <td><%= u.last_seen ? new Date(u.last_seen).toLocaleDateString('zh-CN') : '—' %></td>
+              <td style="text-align:center"><%= u.payment_count || 0 %></td>
+              <td>
+                <% if (u.latest_activation) { %>
+                  <% var latAct = new Date(u.latest_activation); var isExpired = latAct < new Date(); %>
+                  <span style="color:<%= isExpired ? '#666' : '#4CAF50' %>">
+                    <%= latAct.toLocaleDateString('zh-CN') %>
+                  </span>
+                <% } else { %>—<% } %>
+              </td>
+              <td>
+                <input class="notes-input" type="text" value="<%= u.notes || '' %>"
+                  id="notes-<%= u.id %>" placeholder="备注...">
+              </td>
+              <td>
+                <button class="btn btn-confirm" onclick="saveNotes(<%= u.id %>)">保存</button>
+              </td>
+            </tr>
+            <% }); %>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── 付款记录 ── -->
+    <div class="gd-panel" id="panel-payments">
+      <div class="filter-bar">
+        <button class="filter-btn" data-status="all" onclick="filterPayments('all')">全部</button>
+        <button class="filter-btn" data-status="pending" onclick="filterPayments('pending')">待确认</button>
+        <button class="filter-btn" data-status="confirmed" onclick="filterPayments('confirmed')">已确认</button>
+        <button class="filter-btn" data-status="rejected" onclick="filterPayments('rejected')">已拒绝</button>
+      </div>
+      <div class="gd-table-wrap" id="payments-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>用户姓名</th><th>联系方式</th><th>金额</th>
+              <th>付款方式</th><th>提交时间</th><th>状态</th><th>确认人</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="payments-tbody">
+            <% if (typeof payments !== 'undefined' && payments) { %>
+            <% payments.forEach(function(p){ %>
+            <tr id="prow-<%= p.id %>" data-status="<%= p.status %>">
+              <td><%= p.id %></td>
+              <td><%= p.user_name || '—' %></td>
+              <td><%= p.user_contact || '—' %></td>
+              <td><%= p.amount || '—' %> <%= p.currency %></td>
+              <td><%= p.payment_method %></td>
+              <td><%= p.created_at ? new Date(p.created_at).toLocaleString('zh-CN') : '—' %></td>
+              <td>
+                <span class="badge badge-<%= p.status %>">
+                  <%= p.status === 'pending' ? '待确认' : p.status === 'confirmed' ? '已确认' : '已拒绝' %>
+                </span>
+              </td>
+              <td><%= p.confirmed_by || '—' %></td>
+              <td>
+                <% if (p.status === 'pending') { %>
+                <button class="btn btn-confirm" onclick="confirmPayment(<%= p.id %>)">确认</button>
+                <button class="btn btn-reject"  onclick="rejectPayment(<%= p.id %>)">拒绝</button>
+                <% } else if (p.status === 'confirmed') { %>
+                <button class="btn btn-act" onclick="openCreateActModal(<%= p.id %>, <%= p.user_id || 'null' %>)">创建激活码</button>
+                <% } %>
+              </td>
+            </tr>
+            <% }); %>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── 激活码管理 ── -->
+    <div class="gd-panel" id="panel-activations">
+      <div class="gd-gen-form">
+        <h3>🔑 生成新激活码</h3>
+        <div class="gd-form-row">
+          <div class="gd-form-group">
+            <label>用户</label>
+            <select id="act-user-id">
+              <option value="">无（匿名）</option>
+              <% if (typeof users !== 'undefined' && users) { %>
+              <% users.forEach(function(u){ %>
+              <option value="<%= u.id %>"><%= u.name %><% if (u.contact) { %> (<%= u.contact %>)<% } %></option>
+              <% }); %>
+              <% } %>
+            </select>
+          </div>
+          <div class="gd-form-group">
+            <label>关联付款记录ID（可选）</label>
+            <input type="number" id="act-payment-id" placeholder="付款ID">
+          </div>
+          <div class="gd-form-group">
+            <label>有效天数</label>
+            <select id="act-valid-days">
+              <option value="30">30天</option>
+              <option value="90">90天</option>
+              <option value="180">180天</option>
+              <option value="365" selected>365天</option>
+              <option value="9999">永久</option>
+            </select>
+          </div>
+          <div class="gd-form-group">
+            <label>绑定设备ID（可选）</label>
+            <input type="text" id="act-device-bind" placeholder="留空不绑定">
+          </div>
+          <div class="gd-form-group">
+            <label>&nbsp;</label>
+            <button class="btn btn-primary" onclick="generateActivation()">
+              <span id="gen-btn-text">生成激活码</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <p class="section-title">所有激活码</p>
+      <div class="gd-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>用户</th><th>金额</th><th>有效期至</th>
+              <th>设备绑定</th><th>使用状态</th><th>使用时间</th><th>创建人</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (typeof activations !== 'undefined' && activations) { %>
+            <% activations.forEach(function(a){ %>
+            <tr>
+              <td><%= a.id %></td>
+              <td><%= a.user_name || '—' %></td>
+              <td><%= a.payment_amount ? a.payment_amount + ' CNY' : '—' %></td>
+              <td>
+                <% var now2 = new Date(); var expired2 = a.valid_until && new Date(a.valid_until) < now2; %>
+                <span style="color:<%= expired2 ? '#666' : '#4CAF50' %>">
+                  <%= a.valid_until ? new Date(a.valid_until).toLocaleDateString('zh-CN') : '—' %>
+                </span>
+              </td>
+              <td style="font-family:monospace;font-size:0.72rem">
+                <%= a.device_id ? a.device_id.substring(0,10) + '...' : '未绑定' %>
+              </td>
+              <td>
+                <span class="badge <%= expired2 ? 'badge-expired' : (a.is_used ? 'badge-used' : 'badge-active') %>">
+                  <%= expired2 ? '已过期' : (a.is_used ? '已使用' : '未使用') %>
+                </span>
+              </td>
+              <td><%= a.used_at ? new Date(a.used_at).toLocaleString('zh-CN') : '—' %></td>
+              <td><%= a.created_by || '—' %></td>
+              <td><button class="btn btn-qr" onclick="viewQR(<%= a.id %>)">查看QR码</button></td>
+            </tr>
+            <% }); %>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- QR / Result Modal -->
+<div class="gd-modal-overlay" id="gd-modal">
+  <div class="gd-modal">
+    <button class="gd-modal-close" onclick="closeModal()">✕</button>
+    <h3 id="modal-title">激活码二维码</h3>
+    <div id="modal-body">
+      <div class="spinner"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Activation from Payment Modal -->
+<div class="gd-modal-overlay" id="gd-modal-create">
+  <div class="gd-modal">
+    <button class="gd-modal-close" onclick="closeCreateModal()">✕</button>
+    <h3>创建激活码</h3>
+    <div style="text-align:left;margin-bottom:16px">
+      <input type="hidden" id="modal-payment-id">
+      <input type="hidden" id="modal-user-id">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="gd-form-group">
+          <label>有效天数</label>
+          <select id="modal-valid-days" style="background:#111;border:1px solid #444;color:#ccc;border-radius:6px;padding:7px 10px">
+            <option value="30">30天</option>
+            <option value="90">90天</option>
+            <option value="180">180天</option>
+            <option value="365" selected>365天</option>
+            <option value="9999">永久</option>
+          </select>
+        </div>
+        <div class="gd-form-group">
+          <label>绑定设备ID（可选）</label>
+          <input type="text" id="modal-device-bind" placeholder="留空不绑定"
+            style="background:#111;border:1px solid #444;color:#ccc;border-radius:6px;padding:7px 10px">
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="submitCreateAct()">生成激活码</button>
+    <div id="modal-create-result" style="margin-top:16px"></div>
+  </div>
+</div>
+
+<script>
+// ── Tab switching ──────────────────────────────────────
+var currentTab = '';
+
+function gdTab(tab) {
+  document.querySelectorAll('.gd-tab').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('.gd-panel').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelector('[data-tab="' + tab + '"]').classList.add('active');
+  document.getElementById('panel-' + tab).classList.add('active');
+  currentTab = tab;
+
+  // Load data for tab via navigation
+  if (tab === 'users') {
+    window.location.href = '/scoreboard/guandan-admin/users';
+  } else if (tab === 'payments') {
+    window.location.href = '/scoreboard/guandan-admin/payments';
+  } else if (tab === 'activations') {
+    window.location.href = '/scoreboard/guandan-admin/activations';
+  } else {
+    window.location.href = '/scoreboard/guandan-admin';
+  }
+}
+
+// Determine active tab from URL
+(function() {
+  var path = window.location.pathname;
+  var tab = 'dashboard';
+  if (path.endsWith('/users')) tab = 'users';
+  else if (path.endsWith('/payments')) tab = 'payments';
+  else if (path.endsWith('/activations')) tab = 'activations';
+  document.querySelector('[data-tab="' + tab + '"]').classList.add('active');
+  document.getElementById('panel-' + tab).classList.add('active');
+})();
+
+// ── Payment actions ────────────────────────────────────
+function confirmPayment(id) {
+  if (!confirm('确认该付款记录？')) return;
+  fetch('/scoreboard/guandan-admin/payments/' + id + '/confirm', { method: 'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        var row = document.getElementById('prow-' + id) || document.getElementById('pay-row-' + id);
+        if (row) {
+          row.querySelector('.badge').className = 'badge badge-confirmed';
+          row.querySelector('.badge').textContent = '已确认';
+          var btns = row.querySelector('td:last-child');
+          if (btns) btns.innerHTML = '<button class="btn btn-act" onclick="openCreateActModal(' + id + ', null)">创建激活码</button>';
+        }
+      } else { alert('操作失败: ' + (d.error || '')); }
+    }).catch(function(){ alert('网络错误'); });
+}
+
+function rejectPayment(id) {
+  if (!confirm('拒绝该付款记录？')) return;
+  fetch('/scoreboard/guandan-admin/payments/' + id + '/reject', { method: 'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        var row = document.getElementById('prow-' + id) || document.getElementById('pay-row-' + id);
+        if (row) {
+          row.querySelector('.badge').className = 'badge badge-rejected';
+          row.querySelector('.badge').textContent = '已拒绝';
+          var btns = row.querySelector('td:last-child');
+          if (btns) btns.innerHTML = '';
+        }
+      } else { alert('操作失败: ' + (d.error || '')); }
+    }).catch(function(){ alert('网络错误'); });
+}
+
+// ── Save notes ─────────────────────────────────────────
+function saveNotes(userId) {
+  var val = document.getElementById('notes-' + userId).value;
+  fetch('/scoreboard/guandan-admin/users/' + userId + '/notes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ notes: val })
+  }).then(function(r){ return r.json(); })
+    .then(function(d){ if (!d.ok) alert('保存失败'); })
+    .catch(function(){ alert('网络错误'); });
+}
+
+// ── Payment filter ─────────────────────────────────────
+function filterPayments(status) {
+  document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelector('[data-status="' + status + '"]').classList.add('active');
+  var rows = document.querySelectorAll('#payments-tbody tr');
+  rows.forEach(function(row) {
+    var rs = row.getAttribute('data-status');
+    row.style.display = (status === 'all' || rs === status) ? '' : 'none';
+  });
+}
+
+// ── QR Modal ───────────────────────────────────────────
+function closeModal() {
+  document.getElementById('gd-modal').classList.remove('open');
+}
+
+function viewQR(actId) {
+  document.getElementById('modal-title').textContent = '激活码二维码';
+  document.getElementById('modal-body').innerHTML = '<div class="spinner"></div>';
+  document.getElementById('gd-modal').classList.add('open');
+  fetch('/scoreboard/guandan-admin/activations/' + actId + '/qr')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        document.getElementById('modal-body').innerHTML =
+          '<img src="' + d.qr_dataurl + '" alt="QR Code">' +
+          '<div class="act-url">' + d.url + '</div>';
+      } else {
+        document.getElementById('modal-body').innerHTML = '<p style="color:#F44336">加载失败: ' + (d.error || '') + '</p>';
+      }
+    }).catch(function(){
+      document.getElementById('modal-body').innerHTML = '<p style="color:#F44336">网络错误</p>';
+    });
+}
+
+// ── Generate Activation (from activations tab form) ────
+function generateActivation() {
+  var userId = document.getElementById('act-user-id').value;
+  var paymentId = document.getElementById('act-payment-id').value;
+  var validDays = document.getElementById('act-valid-days').value;
+  var deviceBind = document.getElementById('act-device-bind').value;
+
+  var btn = document.getElementById('gen-btn-text');
+  btn.textContent = '生成中...';
+
+  fetch('/scoreboard/guandan-admin/activations/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      user_id: userId || null,
+      payment_id: paymentId || null,
+      valid_days: parseInt(validDays),
+      device_bind: deviceBind || ''
+    })
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      btn.textContent = '生成激活码';
+      if (d.ok) {
+        document.getElementById('modal-title').textContent = '✅ 激活码已生成';
+        document.getElementById('modal-body').innerHTML =
+          '<img src="' + d.qr_dataurl + '" alt="QR Code">' +
+          '<div class="act-code">激活码: ' + d.code + '</div>' +
+          '<div class="act-url">' + d.url + '</div>' +
+          '<div class="act-expiry">有效期至: ' + new Date(d.valid_until).toLocaleString('zh-CN') + '</div>' +
+          '<button class="btn btn-qr" style="margin-top:12px" onclick="copyText(\'' + d.url + '\')">复制链接</button>';
+        document.getElementById('gd-modal').classList.add('open');
+      } else {
+        alert('生成失败: ' + (d.error || '未知错误'));
+      }
+    }).catch(function(){
+      btn.textContent = '生成激活码';
+      alert('网络错误');
+    });
+}
+
+// ── Create activation from payment modal ──────────────
+function openCreateActModal(paymentId, userId) {
+  document.getElementById('modal-payment-id').value = paymentId || '';
+  document.getElementById('modal-user-id').value = userId || '';
+  document.getElementById('modal-create-result').innerHTML = '';
+  document.getElementById('gd-modal-create').classList.add('open');
+}
+
+function closeCreateModal() {
+  document.getElementById('gd-modal-create').classList.remove('open');
+}
+
+function submitCreateAct() {
+  var paymentId = document.getElementById('modal-payment-id').value;
+  var userId = document.getElementById('modal-user-id').value;
+  var validDays = document.getElementById('modal-valid-days').value;
+  var deviceBind = document.getElementById('modal-device-bind').value;
+
+  document.getElementById('modal-create-result').innerHTML = '<div class="spinner"></div>';
+
+  fetch('/scoreboard/guandan-admin/activations/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      user_id: userId || null,
+      payment_id: paymentId || null,
+      valid_days: parseInt(validDays),
+      device_bind: deviceBind || ''
+    })
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        document.getElementById('modal-create-result').innerHTML =
+          '<img src="' + d.qr_dataurl + '" alt="QR Code" style="max-width:180px;background:#fff;padding:6px;border-radius:6px">' +
+          '<div class="act-code" style="font-size:0.7rem;margin-top:8px">激活码: ' + d.code + '</div>' +
+          '<div class="act-url">' + d.url + '</div>' +
+          '<div class="act-expiry">有效期至: ' + new Date(d.valid_until).toLocaleString('zh-CN') + '</div>' +
+          '<button class="btn btn-qr" style="margin-top:10px" onclick="copyText(\'' + d.url + '\')">复制链接</button>';
+      } else {
+        document.getElementById('modal-create-result').innerHTML =
+          '<p style="color:#F44336">生成失败: ' + (d.error || '未知错误') + '</p>';
+      }
+    }).catch(function(){
+      document.getElementById('modal-create-result').innerHTML = '<p style="color:#F44336">网络错误</p>';
+    });
+}
+
+// ── Utility ────────────────────────────────────────────
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(function(){
+    alert('链接已复制');
+  }).catch(function(){
+    prompt('请手动复制：', text);
+  });
+}
+
+// Close modals on overlay click
+document.getElementById('gd-modal').addEventListener('click', function(e){
+  if (e.target === this) closeModal();
+});
+document.getElementById('gd-modal-create').addEventListener('click', function(e){
+  if (e.target === this) closeCreateModal();
+});
+</script>
+</body>
+</html>

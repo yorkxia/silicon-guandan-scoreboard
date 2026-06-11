@@ -17,6 +17,9 @@
     <li class="<%= locals.activePage ==='intelligence' ? 'active' : '' %>">
       <a href="/scoreboard/intelligence">🌐 时事与股票</a>
     </li>
+    <li class="<%= locals.activePage ==='guandan-admin' ? 'active' : '' %>">
+      <a href="/scoreboard/guandan-admin">🎴 掼蛋管理</a>
+    </li>
     <% if (sbUser.role === 'admin') { %>
     <li class="<%= locals.activePage ==='regions' ? 'active' : '' %>">
       <a href="/scoreboard/regions">🗺️ 区域管理</a>

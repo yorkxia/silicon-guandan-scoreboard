@@ -258,6 +258,52 @@ async function initDB() {
     );
   }
 
+  // ============ 掼蛋计分器管理模块 gd_* 表 ============
+  await query(`
+    CREATE TABLE IF NOT EXISTS gd_users (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      contact TEXT DEFAULT '',
+      device_id TEXT DEFAULT '',
+      device_info TEXT DEFAULT '',
+      install_ts BIGINT DEFAULT 0,
+      last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      notes TEXT DEFAULT '',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS gd_payments (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER,
+      amount TEXT DEFAULT '',
+      currency TEXT DEFAULT 'CNY',
+      payment_method TEXT DEFAULT 'wechat',
+      status TEXT DEFAULT 'pending',
+      paid_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      confirmed_by TEXT DEFAULT '',
+      confirmed_at TIMESTAMP,
+      notes TEXT DEFAULT '',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS gd_activations (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER,
+      payment_id INTEGER,
+      code TEXT UNIQUE NOT NULL,
+      valid_from TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      valid_until TIMESTAMP NOT NULL,
+      device_id TEXT DEFAULT '',
+      is_used SMALLINT DEFAULT 0,
+      used_at TIMESTAMP,
+      used_device_id TEXT DEFAULT '',
+      created_by TEXT DEFAULT '',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   console.log('✅ Database initialized');
 }
 
