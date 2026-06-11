@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>广告管理 | Ad Management</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/scoreboard-admin.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <style>
+    .flatpickr-calendar { font-size: 13px; }
+    .flatpickr-input { background: #1a1a1a !important; color: #eee !important; }
+
+    /* 编辑弹窗 */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; z-index: 1000;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(3px);
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: #1a1a1a; border: 1px solid rgba(212,172,13,0.35);
+      border-radius: 16px; padding: 28px 32px; width: 92%; max-width: 720px;
+      max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    }
+    .modal-head {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 20px;
+    }
+    .modal-head h3 { color: #D4AC0D; margin: 0; font-size: 1.1rem; }
+    .modal-close {
+      background: none; border: none; color: #666; font-size: 22px;
+      cursor: pointer; padding: 0 4px; line-height: 1;
+    }
+    .modal-close:hover { color: #ccc; }
+  </style>
+</head>
+<body>
+<% const activePage = 'ads'; %>
+<div class="sb-wrap">
+  <%- include('_layout', { activePage }) %>
+
+  <main class="sb-main">
+    <div class="sb-page-head">
+      <h1>📢 广告管理 · Ad Management</h1>
+    </div>
+
+    <% if (error && error.length > 0) { %>
+      <div class="flash-wrap"><% error.forEach(function(m) { %><div class="flash flash-error"><%= m %></div><% }) %></div>
+    <% } %>
+    <% if (success && success.length > 0) { %>
+      <div class="flash-wrap"><% success.forEach(function(m) { %><div class="flash flash-success"><%= m %></div><% }) %></div>
+    <% } %>
+
+    <!-- Add Ad Form -->
+    <div class="a-card" style="margin-bottom:24px">
+      <h3 style="margin:0 0 16px; color:#D4AC0D">➕ 新增广告</h3>
+      <form action="/scoreboard/ads/add" method="POST">
+        <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:12px; margin-bottom:12px">
+          <div class="a-form-group" style="margin:0">
+            <label>广告标题 *</label>
+            <input type="text" name="title" class="a-input" placeholder="广告标题" required>
+          </div>
+          <div class="a-form-group" style="margin:0">
+            <label>内容类型</label>
+            <select name="content_type" class="a-input" id="adContentType" onchange="toggleAdFields(this.value, 'fieldUrl')">
+              <option value="text">文字</option>
+              <option value="image">图片</option>
+              <option value="banner">横幅</option>
+            </select>
+          </div>
+          <div class="a-form-group" style="margin:0">
+            <label>目标区域</label>
+            <select name="region_id" class="a-input">
+              <option value="">全球通用 (GLOBAL)</option>
+              <% regions.forEach(function(r) { %>
+                <option value="<%= r.id %>"><%= r.area_code %> · <%= r.area_name_zh %></option>
+              <% }) %>
+            </select>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px">
+          <div class="a-form-group" style="margin:0" id="fieldText">
+            <label>广告文字内容</label>
+            <textarea name="content_text" class="a-input" rows="3" placeholder="广告文字内容..."></textarea>
+          </div>
+          <div class="a-form-group" style="margin:0; display:none" id="fieldUrl">
+            <label>图片/媒体 URL</label>
+            <input type="url" name="content_url" class="a-input" placeholder="https://...">
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:12px; margin-bottom:16px">
+          <div class="a-form-group" style="margin:0">
+            <label>点击跳转链接</label>
+            <input type="url" name="link_url" class="a-input" placeholder="https://...（可选）">
+          </div>
+          <div class="a-form-group" style="margin:0">
+            <label>开始时间（可选）</label>
+            <input type="text" name="start_time" class="a-input flatpickr-dt" placeholder="点击选择时间...">
+          </div>
+          <div class="a-form-group" style="margin:0">
+            <label>结束时间（可选）</label>
+            <input type="text" name="end_time" class="a-input flatpickr-dt" placeholder="点击选择时间...">
+          </div>
+          <div class="a-form-group" style="margin:0">
+            <label>高频播放（分钟/次）</label>
+            <input type="number" name="frequency_minutes" class="a-input" placeholder="留空=均分轮播" min="1" max="1440">
+            <div style="font-size:0.72rem; color:#666; margin-top:3px">设置后每隔N分钟强制播放一次</div>
+          </div>
+        </div>
+        <button type="submit" class="abtn abtn-primary">➕ 发布广告</button>
+      </form>
+    </div>
+
+    <!-- Ads Table -->
+    <div class="a-card">
+      <h3 style="margin:0 0 16px; color:#D4AC0D">广告列表 (<%= ads.length %>)</h3>
+      <% if (ads.length > 0) { %>
+      <table class="a-table">
+        <thead>
+          <tr><th>ID</th><th>标题</th><th>类型</th><th>区域</th><th>状态</th><th>展示</th><th>点击</th><th>频率</th><th>有效期</th><th>操作</th></tr>
+        </thead>
+        <tbody>
+          <% ads.forEach(function(ad) { %>
+            <tr>
+              <td><%= ad.id %></td>
+              <td>
+                <strong><%= ad.title %></strong>
+                <% if (ad.content_text) { %>
+                  <div style="font-size:0.75rem; color:#888; margin-top:2px"><%= ad.content_text.slice(0,50) %><%= ad.content_text.length > 50 ? '...' : '' %></div>
+                <% } %>
+              </td>
+              <td><span style="font-size:0.78rem; color:#aaa"><%= ad.content_type %></span></td>
+              <td><%= ad.area_name_zh || '<span style="color:#666">全球</span>' %></td>
+              <td>
+                <span style="color:<%= ad.is_active ? '#4CAF50' : '#e53' %>">
+                  <%= ad.is_active ? '✅ 启用' : '⛔ 暂停' %>
+                </span>
+              </td>
+              <td><strong><%= ad.impressions %></strong></td>
+              <td><strong><%= ad.clicks %></strong></td>
+              <td style="font-size:0.78rem">
+                <% if (ad.frequency_minutes) { %>
+                  <span style="color:#F0C820; font-weight:bold">⚡ 每<%= ad.frequency_minutes %>分钟</span>
+                <% } else { %>
+                  <span style="color:#555">均分轮播</span>
+                <% } %>
+              </td>
+              <td style="font-size:0.75rem; color:#777">
+                <% if (ad.start_time || ad.end_time) { %>
+                  <%= ad.start_time ? new Date(ad.start_time).toLocaleDateString('zh-CN') : '即刻' %>
+                  ~
+                  <%= ad.end_time ? new Date(ad.end_time).toLocaleDateString('zh-CN') : '永久' %>
+                <% } else { %>
+                  永久有效
+                <% } %>
+              </td>
+              <td style="white-space:nowrap">
+                <!-- 编辑按钮 -->
+                <button type="button" class="abtn"
+                  style="font-size:0.75rem; padding:4px 10px; background:#2c6fad; color:#fff; border:none; cursor:pointer"
+                  onclick="openEdit({
+                    id: <%= ad.id %>,
+                    title: <%= JSON.stringify(ad.title) %>,
+                    content_type: <%= JSON.stringify(ad.content_type) %>,
+                    content_text: <%= JSON.stringify(ad.content_text || '') %>,
+                    content_url: <%= JSON.stringify(ad.content_url || '') %>,
+                    link_url: <%= JSON.stringify(ad.link_url || '') %>,
+                    region_id: '<%= ad.region_id || "" %>',
+                    start_time: '<%= ad.start_time ? new Date(ad.start_time).toISOString().slice(0,19).replace("T"," ") : "" %>',
+                    end_time: '<%= ad.end_time ? new Date(ad.end_time).toISOString().slice(0,19).replace("T"," ") : "" %>',
+                    frequency_minutes: '<%= ad.frequency_minutes || "" %>'
+                  })">✏️ 编辑</button>
+                <!-- 暂停/启用 -->
+                <form action="/scoreboard/ads/<%= ad.id %>/toggle" method="POST" style="display:inline">
+                  <button type="submit" class="abtn" style="font-size:0.75rem; padding:4px 10px; background:<%= ad.is_active ? '#e74c3c' : '#27ae60' %>; color:#fff; border:none; cursor:pointer">
+                    <%= ad.is_active ? '暂停' : '启用' %>
+                  </button>
+                </form>
+                <!-- 删除 -->
+                <form action="/scoreboard/ads/<%= ad.id %>/delete" method="POST" style="display:inline" onsubmit="return confirm('确认删除广告?')">
+                  <button type="submit" class="abtn" style="font-size:0.75rem; padding:4px 10px; background:#555; color:#fff; border:none; cursor:pointer">删除</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <% } else { %>
+        <p style="color:#666; text-align:center; padding:30px">暂无广告，请添加第一条广告</p>
+      <% } %>
+    </div>
+  </main>
+</div>
+
+<!-- ── 编辑广告弹窗 ── -->
+<div class="modal-overlay" id="editModal" onclick="closeEditOnBg(event)">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>✏️ 编辑广告 · Edit Ad <span id="editAdId" style="color:#888; font-size:0.85rem"></span></h3>
+      <button class="modal-close" onclick="closeEdit()">✕</button>
+    </div>
+    <form id="editForm" method="POST">
+      <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:12px; margin-bottom:12px">
+        <div class="a-form-group" style="margin:0">
+          <label>广告标题 *</label>
+          <input type="text" name="title" id="e_title" class="a-input" required>
+        </div>
+        <div class="a-form-group" style="margin:0">
+          <label>内容类型</label>
+          <select name="content_type" id="e_content_type" class="a-input" onchange="toggleAdFields(this.value, 'e_fieldUrl')">
+            <option value="text">文字</option>
+            <option value="image">图片</option>
+            <option value="banner">横幅</option>
+          </select>
+        </div>
+        <div class="a-form-group" style="margin:0">
+          <label>目标区域</label>
+          <select name="region_id" id="e_region_id" class="a-input">
+            <option value="">全球通用 (GLOBAL)</option>
+            <% regions.forEach(function(r) { %>
+              <option value="<%= r.id %>"><%= r.area_code %> · <%= r.area_name_zh %></option>
+            <% }) %>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px">
+        <div class="a-form-group" style="margin:0">
+          <label>广告文字内容</label>
+          <textarea name="content_text" id="e_content_text" class="a-input" rows="3"></textarea>
+        </div>
+        <div class="a-form-group" style="margin:0" id="e_fieldUrl">
+          <label>图片/媒体 URL</label>
+          <input type="url" name="content_url" id="e_content_url" class="a-input" placeholder="https://...">
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:12px; margin-bottom:20px">
+        <div class="a-form-group" style="margin:0">
+          <label>点击跳转链接</label>
+          <input type="url" name="link_url" id="e_link_url" class="a-input" placeholder="https://...（可选）">
+        </div>
+        <div class="a-form-group" style="margin:0">
+          <label>开始时间</label>
+          <input type="text" name="start_time" id="e_start_time" class="a-input flatpickr-dt-edit" placeholder="点击选择...">
+        </div>
+        <div class="a-form-group" style="margin:0">
+          <label>结束时间</label>
+          <input type="text" name="end_time" id="e_end_time" class="a-input flatpickr-dt-edit" placeholder="点击选择...">
+        </div>
+        <div class="a-form-group" style="margin:0">
+          <label>高频播放（分钟/次）</label>
+          <input type="number" name="frequency_minutes" id="e_frequency_minutes" class="a-input" placeholder="留空=均分轮播" min="1" max="1440">
+        </div>
+      </div>
+      <div style="display:flex; gap:10px">
+        <button type="submit" class="abtn abtn-primary" style="flex:1">✅ 保存并重新发布</button>
+        <button type="button" class="abtn" onclick="closeEdit()" style="background:#333; color:#aaa; border:none; cursor:pointer; padding:8px 20px; border-radius:6px">取消</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>
+<script>
+var fpConfig = { enableTime:true, dateFormat:'Y-m-d H:i:S', time_24hr:true, locale:'zh', allowInput:true };
+flatpickr('.flatpickr-dt', fpConfig);
+
+var editFpStart = flatpickr('#e_start_time', fpConfig);
+var editFpEnd   = flatpickr('#e_end_time',   fpConfig);
+
+function toggleAdFields(type, urlFieldId) {
+  var el = document.getElementById(urlFieldId);
+  if (el) el.style.display = (type === 'image' || type === 'banner') ? '' : 'none';
+}
+
+function openEdit(ad) {
+  document.getElementById('editAdId').textContent = '(ID: ' + ad.id + ')';
+  document.getElementById('editForm').action = '/scoreboard/ads/' + ad.id + '/edit';
+
+  document.getElementById('e_title').value            = ad.title;
+  document.getElementById('e_content_text').value     = ad.content_text;
+  document.getElementById('e_content_url').value      = ad.content_url;
+  document.getElementById('e_link_url').value         = ad.link_url;
+  document.getElementById('e_frequency_minutes').value = ad.frequency_minutes;
+
+  // 内容类型
+  var ct = document.getElementById('e_content_type');
+  ct.value = ad.content_type;
+  toggleAdFields(ad.content_type, 'e_fieldUrl');
+
+  // 区域
+  document.getElementById('e_region_id').value = ad.region_id;
+
+  // 时间（通过 flatpickr setDate）
+  editFpStart.setDate(ad.start_time || null, false);
+  editFpEnd.setDate(ad.end_time   || null, false);
+
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeEdit() {
+  document.getElementById('editModal').classList.remove('open');
+}
+
+function closeEditOnBg(e) {
+  if (e.target === document.getElementById('editModal')) closeEdit();
+}
+</script>
+</body>
+</html>

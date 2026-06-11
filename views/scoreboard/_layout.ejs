@@ -1,0 +1,36 @@
+<%# Scoreboard shared sidebar partial — included by other views %>
+<nav class="sb-sidebar">
+  <div class="sb-sidebar-logo">
+    <div style="font-size:1.8rem">📊</div>
+    <div style="font-size:0.8rem; color:#D4AC0D; margin-top:4px">监控系统</div>
+  </div>
+  <ul class="sb-nav">
+    <li class="<%= locals.activePage ==='dashboard' ? 'active' : '' %>">
+      <a href="/scoreboard/dashboard">🏠 控制台</a>
+    </li>
+    <li class="<%= locals.activePage ==='ads' ? 'active' : '' %>">
+      <a href="/scoreboard/ads">📢 广告管理</a>
+    </li>
+    <li class="<%= locals.activePage ==='analytics' ? 'active' : '' %>">
+      <a href="/scoreboard/analytics">📈 流量统计</a>
+    </li>
+    <li class="<%= locals.activePage ==='intelligence' ? 'active' : '' %>">
+      <a href="/scoreboard/intelligence">🌐 时事与股票</a>
+    </li>
+    <% if (sbUser.role === 'admin') { %>
+    <li class="<%= locals.activePage ==='regions' ? 'active' : '' %>">
+      <a href="/scoreboard/regions">🗺️ 区域管理</a>
+    </li>
+    <li class="<%= locals.activePage ==='users' ? 'active' : '' %>">
+      <a href="/scoreboard/users">👥 用户管理</a>
+    </li>
+    <% } %>
+  </ul>
+  <div class="sb-sidebar-footer">
+    <div style="font-size:0.78rem; color:#888; margin-bottom:8px"><%= sbUser.display_name || sbUser.username %></div>
+    <div style="font-size:0.72rem; color:#555; margin-bottom:10px"><%= sbUser.role === 'admin' ? '管理员' : '区域用户' %></div>
+    <form action="/scoreboard/logout" method="POST" style="margin:0">
+      <button type="submit" class="sb-logout-btn">退出登录</button>
+    </form>
+  </div>
+</nav>

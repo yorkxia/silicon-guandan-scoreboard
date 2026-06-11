@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>时事与股票形势 | 监控系统</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/scoreboard-admin.css">
+  <style>
+    /* ── Intel-specific styles ─────────────────────────────────────── */
+    .intel-tabs { display:flex; gap:4px; margin-bottom:24px; border-bottom:1px solid rgba(212,172,13,.2); padding-bottom:0; }
+    .intel-tab-btn {
+      padding:10px 22px; background:transparent; border:none; border-bottom:3px solid transparent;
+      color:#888; font-size:.9rem; cursor:pointer; transition:all .2s; font-weight:500;
+      margin-bottom:-1px;
+    }
+    .intel-tab-btn.active { color:#D4AC0D; border-bottom-color:#D4AC0D; }
+    .intel-tab-btn:hover:not(.active) { color:#ccc; }
+    .intel-tab-pane { display:none; }
+    .intel-tab-pane.active { display:block; }
+
+    /* Summary card */
+    .intel-summary {
+      background:linear-gradient(135deg,#0f1b2b,#152535);
+      border:1px solid rgba(41,116,166,.4);
+      border-radius:12px; padding:24px 28px; margin-bottom:20px; line-height:1.9;
+    }
+    .intel-summary h2 { color:#5dade2; margin:.8rem 0 .3rem; font-size:1rem; }
+    .intel-summary h3 { color:#85c1e9; margin:.6rem 0 .2rem; font-size:.9rem; }
+    .intel-summary strong { color:#f0c842; }
+    .intel-summary em { color:#aaa; font-style:normal; font-size:.82rem; }
+
+    /* Stock grid */
+    .stock-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:12px; margin-bottom:20px; }
+    .stock-card {
+      background:#1a1a1a; border:1px solid #2a2a2a; border-radius:10px;
+      padding:14px 16px; transition:border-color .2s;
+    }
+    .stock-card:hover { border-color:rgba(212,172,13,.4); }
+    .stock-card.up   { border-left:3px solid #27ae60; }
+    .stock-card.down { border-left:3px solid #e74c3c; }
+    .stock-sym   { font-size:.95rem; font-weight:700; color:#eee; }
+    .stock-name  { font-size:.72rem; color:#666; margin-bottom:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .stock-price { font-size:1.2rem; font-weight:700; color:#f0f0f0; }
+    .stock-chg   { font-size:.82rem; margin-top:4px; font-weight:600; }
+    .stock-chg.up   { color:#27ae60; }
+    .stock-chg.down { color:#e74c3c; }
+    .stock-vol   { font-size:.72rem; color:#555; margin-top:4px; }
+
+    /* Movers table */
+    .movers-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:20px; }
+    @media(max-width:900px){ .movers-grid{ grid-template-columns:1fr; } }
+    .mover-col h4 { color:#D4AC0D; font-size:.82rem; font-weight:600; margin:0 0 10px; letter-spacing:.5px; text-transform:uppercase; }
+    .mover-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.04); font-size:.82rem; }
+    .mover-sym { color:#ddd; font-weight:600; }
+    .mover-pct.up   { color:#27ae60; }
+    .mover-pct.down { color:#e74c3c; }
+
+    /* Analysis text */
+    .analysis-text { white-space:pre-wrap; color:#ccc; font-size:.88rem; line-height:1.9; }
+
+    /* Flight results */
+    .flight-dest { margin-bottom:16px; }
+    .flight-dest h4 { color:#5dade2; font-size:.88rem; margin:0 0 8px; }
+    .flight-dates { display:flex; flex-wrap:wrap; gap:8px; }
+    .flight-date-badge {
+      background:#111; border:1px solid #2a2a2a; border-radius:6px;
+      padding:5px 10px; font-size:.78rem; color:#bbb;
+    }
+    .flight-date-badge.has-j { border-color:#27ae60; color:#27ae60; background:rgba(39,174,96,.08); }
+
+    /* Config panel */
+    .config-toggle { background:transparent; border:1px solid #444; color:#888; padding:6px 14px; border-radius:6px; font-size:.8rem; cursor:pointer; transition:all .2s; }
+    .config-toggle:hover { border-color:#D4AC0D; color:#D4AC0D; }
+    .config-panel { display:none; background:#111; border:1px solid #2a2a2a; border-radius:10px; padding:22px; margin-top:16px; }
+    .config-panel.open { display:block; }
+    .cfg-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    @media(max-width:700px){ .cfg-grid{ grid-template-columns:1fr; } }
+    .cfg-section { margin-bottom:18px; }
+    .cfg-section h5 { color:#D4AC0D; font-size:.8rem; font-weight:600; margin:0 0 10px; letter-spacing:.5px; text-transform:uppercase; }
+    .source-checks { display:flex; flex-wrap:wrap; gap:8px; }
+    .source-check label { color:#aaa; font-size:.8rem; display:flex; align-items:center; gap:5px; cursor:pointer; }
+    .source-check input[type=checkbox] { accent-color:#D4AC0D; }
+    .dest-checks { display:flex; flex-wrap:wrap; gap:8px; }
+
+    /* History table */
+    .history-ts { font-size:.75rem; color:#555; }
+
+    /* Tag badge */
+    .tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:.72rem; font-weight:600; }
+    .tag-morning { background:rgba(255,200,0,.12); color:#f0c842; }
+    .tag-noon    { background:rgba(41,182,246,.12); color:#29b6f6; }
+    .tag-evening { background:rgba(156,39,176,.12);  color:#ba68c8; }
+    .tag-manual  { background:rgba(255,255,255,.06);  color:#888; }
+
+    /* Run-now section */
+    .run-now-bar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .run-select { background:#111; border:1px solid #333; color:#ccc; padding:6px 10px; border-radius:6px; font-size:.82rem; }
+
+    /* No-data placeholder */
+    .no-data { text-align:center; padding:40px; color:#444; font-size:.9rem; }
+
+    .ts-badge { color:#555; font-size:.75rem; }
+    .abtn-danger { background:rgba(231,76,60,.15); color:#e74c3c; border:1px solid rgba(231,76,60,.3); }
+    .abtn-danger:hover { background:rgba(231,76,60,.25); }
+    .abtn-info { background:rgba(41,116,166,.15); color:#5dade2; border:1px solid rgba(41,116,166,.3); }
+    .abtn-info:hover { background:rgba(41,116,166,.25); }
+  </style>
+</head>
+<body>
+<% const activePage = 'intelligence'; %>
+<div class="sb-wrap">
+  <%- include('_layout', { activePage }) %>
+
+  <main class="sb-main">
+    <!-- Page Header -->
+    <div class="sb-page-head">
+      <h1>🌐 时事与股票形势</h1>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <% if (sbUser.role === 'admin') { %>
+        <button class="config-toggle" onclick="toggleConfig()">⚙️ 配置</button>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- Flash -->
+    <% if (error && error.length > 0) { %>
+    <div class="flash-wrap"><% error.forEach(m => { %><div class="flash flash-error"><%= m %></div><% }) %></div>
+    <% } %>
+    <% if (success && success.length > 0) { %>
+    <div class="flash-wrap"><% success.forEach(m => { %><div class="flash flash-success"><%= m %></div><% }) %></div>
+    <% } %>
+
+    <!-- Config Panel (Admin Only) -->
+    <% if (sbUser.role === 'admin') { %>
+    <div class="config-panel" id="configPanel">
+      <form action="/scoreboard/intelligence/config" method="POST">
+        <div class="cfg-grid">
+
+          <!-- LEFT COLUMN -->
+          <div>
+            <div class="cfg-section">
+              <h5>📰 新闻设置</h5>
+              <div class="a-form-group">
+                <label>发布时间 (旧金山时区，逗号分隔，如 07:30,11:30,17:00)</label>
+                <input class="a-input" name="news_times" value="<%= cfg.news_times || '07:30,11:30,17:00' %>" placeholder="07:30,11:30,17:00">
+              </div>
+              <div class="a-form-group" style="margin-top:10px">
+                <label>收件邮箱</label>
+                <input class="a-input" name="news_email" value="<%= cfg.news_email || 'York.xia@gmail.com' %>">
+              </div>
+              <div class="a-form-group" style="margin-top:10px">
+                <label>新闻来源</label>
+                <div class="source-checks">
+                  <% const enabledSources = (cfg.news_sources || '').split(','); %>
+                  <% Object.entries(rssSources).forEach(([key, src]) => { %>
+                  <div class="source-check">
+                    <label>
+                      <input type="checkbox" name="news_sources" value="<%= key %>"
+                        <%= enabledSources.includes(key) ? 'checked' : '' %>>
+                      <%= src.name %> (<%= src.region %>)
+                    </label>
+                  </div>
+                  <% }) %>
+                </div>
+              </div>
+            </div>
+
+            <div class="cfg-section">
+              <h5>🤖 AI 摘要 (Claude API)</h5>
+              <div class="a-form-group">
+                <label>Anthropic API Key (留空则只显示头条标题，不做AI摘要)</label>
+                <input class="a-input" name="anthropic_api_key" type="password"
+                  value="<%= cfg.anthropic_api_key || '' %>" placeholder="sk-ant-...">
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT COLUMN -->
+          <div>
+            <div class="cfg-section">
+              <h5>✈️ 积分机票搜索 (seats.aero)</h5>
+              <div class="cfg-grid" style="gap:10px">
+                <div class="a-form-group">
+                  <label>出发机场代码</label>
+                  <input class="a-input" name="flight_origin" value="<%= cfg.flight_origin || 'SFO' %>" placeholder="SFO">
+                </div>
+                <div class="a-form-group">
+                  <label>舱位</label>
+                  <select class="a-input" name="flight_cabin">
+                    <option value="business" <%= (cfg.flight_cabin||'business')==='business'?'selected':'' %>>商务舱 (J)</option>
+                    <option value="first"    <%= (cfg.flight_cabin||'')==='first'?'selected':'' %>>头等舱 (F)</option>
+                    <option value="economy"  <%= (cfg.flight_cabin||'')==='economy'?'selected':'' %>>经济舱 (Y)</option>
+                  </select>
+                </div>
+                <div class="a-form-group">
+                  <label>搜索月数</label>
+                  <input class="a-input" name="flight_months" type="number" min="1" max="11"
+                    value="<%= cfg.flight_months || 1 %>">
+                </div>
+                <div class="a-form-group">
+                  <label>机票收件邮箱</label>
+                  <input class="a-input" name="flight_email" value="<%= cfg.flight_email || 'York.xia@gmail.com' %>">
+                </div>
+              </div>
+              <div class="a-form-group" style="margin-top:8px">
+                <label>目的地</label>
+                <div class="dest-checks">
+                  <% const enabledDests = (cfg.flight_destinations || '').split(',').map(s=>s.trim()); %>
+                  <% Object.keys(destAirports).forEach(dest => { %>
+                  <div class="source-check">
+                    <label>
+                      <input type="checkbox" name="flight_destinations" value="<%= dest %>"
+                        <%= enabledDests.includes(dest) ? 'checked' : '' %>>
+                      <%= dest %>
+                    </label>
+                  </div>
+                  <% }) %>
+                </div>
+              </div>
+              <div class="a-form-group" style="margin-top:8px">
+                <label>seats.aero API Key</label>
+                <input class="a-input" name="seats_aero_key" type="password"
+                  value="<%= cfg.seats_aero_key || '' %>" placeholder="在 seats.aero 申请">
+              </div>
+            </div>
+
+            <div class="cfg-section">
+              <h5>📈 股票自选池</h5>
+              <div class="a-form-group">
+                <label>股票代码 (逗号分隔)</label>
+                <input class="a-input" name="stock_watchlist"
+                  value="<%= cfg.stock_watchlist || defaultWatchlist.join(',') %>"
+                  placeholder="AAPL,NVDA,MSFT,...">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:8px">
+          <button type="submit" class="abtn abtn-primary">💾 保存配置</button>
+          <button type="button" class="abtn abtn-secondary" onclick="toggleConfig()">取消</button>
+        </div>
+      </form>
+    </div>
+    <% } %>
+
+    <!-- Run Now Bar (Admin) -->
+    <% if (sbUser.role === 'admin') { %>
+    <div class="a-card" style="margin-bottom:20px;padding:14px 20px">
+      <form action="/scoreboard/intelligence/run-now" method="POST" id="runNowForm">
+        <div class="run-now-bar">
+          <span style="color:#888;font-size:.82rem">⚡ 立即执行：</span>
+          <select name="job_type" class="run-select">
+            <option value="">全部（新闻+机票+股票）</option>
+            <option value="news">📰 新闻摘要</option>
+            <option value="flight">✈️ 机票查询</option>
+            <option value="stock">📈 股票分析</option>
+          </select>
+          <select name="session" class="run-select">
+            <option value="手动">手动</option>
+            <option value="早上">早上</option>
+            <option value="中午">中午</option>
+            <option value="晚上">晚上</option>
+          </select>
+          <button type="submit" class="abtn abtn-primary" onclick="this.textContent='⏳ 执行中...';this.disabled=true;document.getElementById('runNowForm').submit()">▶ 立即执行</button>
+          <span style="color:#555;font-size:.75rem">（执行时间约10-60秒，请等待页面刷新）</span>
+        </div>
+      </form>
+    </div>
+    <% } %>
+
+    <!-- ── Tabs ──────────────────────────────────────────────────── -->
+    <div class="intel-tabs">
+      <button class="intel-tab-btn active" onclick="switchTab('news',this)">📰 时事与旅行</button>
+      <button class="intel-tab-btn" onclick="switchTab('stock',this)">📈 股票分析</button>
+    </div>
+
+    <!-- ══════════════════ TAB 1: 时事与旅行 ══════════════════════ -->
+    <div class="intel-tab-pane active" id="tab-news">
+
+      <!-- Latest News Summary -->
+      <% if (latestNews) { %>
+      <div class="a-card" style="margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+          <div>
+            <h3 style="margin:0;color:#eee;font-size:1rem">📰 最新全球时事摘要</h3>
+            <div style="margin-top:5px">
+              <span class="tag tag-<%= latestNews.session_type==='早上'?'morning':latestNews.session_type==='中午'?'noon':'evening' %>"><%= latestNews.session_type %></span>
+              <span class="ts-badge" style="margin-left:8px"><%= new Date(latestNews.fetched_at).toLocaleString('zh-CN',{timeZone:'America/Los_Angeles'}) %> PST</span>
+            </div>
+          </div>
+        </div>
+        <div class="intel-summary"><%- formatMd(latestNews.summary) %></div>
+        <% if (latestNews.sources_used) { %>
+        <div style="margin-top:10px;font-size:.75rem;color:#555">来源：<%= latestNews.sources_used %></div>
+        <% } %>
+      </div>
+      <% } else { %>
+      <div class="a-card" style="margin-bottom:20px">
+        <div class="no-data">📰 暂无新闻数据，请点击「立即执行」获取</div>
+      </div>
+      <% } %>
+
+      <!-- Latest Flight Results -->
+      <div class="a-card" style="margin-bottom:20px">
+        <h3 style="margin:0 0 16px;color:#eee;font-size:1rem">✈️ 积分商务舱机票</h3>
+        <% if (flightData && flightData.results && flightData.results.length > 0) { %>
+          <div style="margin-bottom:8px;font-size:.82rem;color:#888">
+            出发：<strong style="color:#D4AC0D"><%= flightData.origin %></strong> |
+            舱位：<strong style="color:#D4AC0D"><%= flightData.cabin === 'business' ? '商务舱 (J)' : flightData.cabin %></strong> |
+            区间：<%= flightData.startDate %> ~ <%= flightData.endDate %>
+            <span class="ts-badge" style="margin-left:12px">更新于 <%= latestFlight ? new Date(latestFlight.fetched_at).toLocaleString('zh-CN',{timeZone:'America/Los_Angeles'}) : '' %></span>
+          </div>
+          <% flightData.results.forEach(r => { %>
+          <div class="flight-dest">
+            <h4>✈️ <%= r.destination %> (<%= r.airport %>) — 共 <%= r.count %> 个可用日期</h4>
+            <div class="flight-dates">
+              <% r.dates.forEach(d => { %>
+              <div class="flight-date-badge <%= d.j ? 'has-j' : '' %>">
+                <%= d.date %> <%= d.j ? '✅J' : '❌J' %><% if(d.seats){%>(<%= d.seats %>席)<% } %>
+              </div>
+              <% }) %>
+            </div>
+          </div>
+          <% }) %>
+        <% } else if (flightData && flightData.note) { %>
+          <div style="color:#888;font-size:.85rem;padding:12px">⚠️ <%= flightData.note %></div>
+        <% } else { %>
+          <div class="no-data">✈️ 暂无机票数据。请配置 seats.aero API Key 后执行查询</div>
+        <% } %>
+      </div>
+
+      <!-- News History -->
+      <div class="a-card">
+        <h3 style="margin:0 0 14px;color:#eee;font-size:.95rem">📋 历史新闻记录</h3>
+        <% if (newsHistory && newsHistory.length > 0) { %>
+        <table class="a-table">
+          <thead><tr><th>时间 (PST)</th><th>时段</th><th>来源</th><th>操作</th></tr></thead>
+          <tbody>
+            <% newsHistory.forEach(n => { %>
+            <tr>
+              <td class="history-ts"><%= new Date(n.fetched_at).toLocaleString('zh-CN',{timeZone:'America/Los_Angeles'}) %></td>
+              <td><span class="tag tag-<%= n.session_type==='早上'?'morning':n.session_type==='中午'?'noon':n.session_type==='晚上'?'evening':'manual' %>"><%= n.session_type %></span></td>
+              <td style="font-size:.75rem;color:#666;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><%= n.sources_used %></td>
+              <td><button class="abtn abtn-info" style="padding:3px 10px;font-size:.75rem" onclick="loadNewsDetail(<%= n.id %>)">查看</button></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        <% } else { %>
+        <div class="no-data" style="padding:20px">暂无历史记录</div>
+        <% } %>
+      </div>
+    </div>
+
+    <!-- ══════════════════ TAB 2: 股票分析 ═══════════════════════ -->
+    <div class="intel-tab-pane" id="tab-stock">
+
+      <!-- Watchlist Stock Cards -->
+      <% if (latestWatchlist && latestWatchlist.length > 0) { %>
+      <div class="a-card" style="margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h3 style="margin:0;color:#eee;font-size:1rem">📊 自选股行情</h3>
+          <% if (latestStock) { %>
+          <span class="ts-badge">更新于 <%= new Date(latestStock.fetched_at).toLocaleString('zh-CN',{timeZone:'America/Los_Angeles'}) %> PST</span>
+          <% } %>
+        </div>
+        <div class="stock-grid">
+          <% latestWatchlist.forEach(s => {
+               const up = (s.changePct || 0) >= 0;
+               const arrow = up ? '▲' : '▼';
+          %>
+          <div class="stock-card <%= up ? 'up' : 'down' %>">
+            <div class="stock-sym"><%= s.symbol %></div>
+            <div class="stock-name" title="<%= s.name %>"><%= s.name %></div>
+            <div class="stock-price">$<%= s.price != null ? Number(s.price).toFixed(2) : 'N/A' %></div>
+            <div class="stock-chg <%= up ? 'up' : 'down' %>"><%= arrow %> <%= s.changePct != null ? Math.abs(s.changePct).toFixed(2) : 'N/A' %>%</div>
+            <div class="stock-vol">Vol: <%= s.volume != null ? Number(s.volume).toLocaleString('en-US',{notation:'compact',maximumFractionDigits:1}) : 'N/A' %></div>
+          </div>
+          <% }) %>
+        </div>
+      </div>
+      <% } else { %>
+      <div class="a-card" style="margin-bottom:20px">
+        <div class="no-data">📊 暂无股票数据，请点击「立即执行 → 股票分析」</div>
+      </div>
+      <% } %>
+
+      <!-- AI Analysis -->
+      <% if (latestStock && latestStock.analysis) { %>
+      <div class="a-card" style="margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <h3 style="margin:0;color:#eee;font-size:1rem">🤖 AI 股市分析报告</h3>
+          <span class="tag tag-<%= latestStock.session_type==='早上'?'morning':latestStock.session_type==='中午'?'noon':'evening' %>"><%= latestStock.session_type %></span>
+        </div>
+        <div class="intel-summary"><pre class="analysis-text"><%= latestStock.analysis %></pre></div>
+      </div>
+      <% } %>
+
+      <!-- Market Movers -->
+      <% if (latestMovers && (latestMovers.gainers.length || latestMovers.losers.length || latestMovers.active.length)) { %>
+      <div class="a-card" style="margin-bottom:20px">
+        <h3 style="margin:0 0 16px;color:#eee;font-size:1rem">🏆 市场概览</h3>
+        <div class="movers-grid">
+          <div class="mover-col">
+            <h4>📈 今日涨幅榜</h4>
+            <% latestMovers.gainers.slice(0,8).forEach(s => { %>
+            <div class="mover-row">
+              <span class="mover-sym"><%= s.symbol %></span>
+              <span class="mover-pct up"><%= s.regularMarketChangePercent != null ? '+'+Number(s.regularMarketChangePercent).toFixed(2)+'%' : 'N/A' %></span>
+            </div>
+            <% }) %>
+          </div>
+          <div class="mover-col">
+            <h4>📉 今日跌幅榜</h4>
+            <% latestMovers.losers.slice(0,8).forEach(s => { %>
+            <div class="mover-row">
+              <span class="mover-sym"><%= s.symbol %></span>
+              <span class="mover-pct down"><%= s.regularMarketChangePercent != null ? Number(s.regularMarketChangePercent).toFixed(2)+'%' : 'N/A' %></span>
+            </div>
+            <% }) %>
+          </div>
+          <div class="mover-col">
+            <h4>🔥 成交最活跃</h4>
+            <% latestMovers.active.slice(0,8).forEach(s => { %>
+            <div class="mover-row">
+              <span class="mover-sym"><%= s.symbol %></span>
+              <span class="mover-pct <%= (s.regularMarketChangePercent||0)>=0?'up':'down' %>">
+                <%= s.regularMarketChangePercent != null ? (s.regularMarketChangePercent>=0?'+':'')+Number(s.regularMarketChangePercent).toFixed(2)+'%' : 'N/A' %>
+              </span>
+            </div>
+            <% }) %>
+          </div>
+        </div>
+      </div>
+      <% } %>
+
+      <!-- Disclaimer -->
+      <div style="color:#444;font-size:.75rem;padding:10px 0;text-align:center">
+        ⚠️ 以上信息仅供参考，不构成任何投资建议。股市有风险，投资需谨慎。
+        数据来源：Yahoo Finance。AI分析由 Claude 生成。
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- News Detail Modal -->
+<div id="newsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;overflow-y:auto" onclick="if(event.target===this)this.style.display='none'">
+  <div style="max-width:800px;margin:60px auto;background:#1a1a1a;border:1px solid rgba(212,172,13,.3);border-radius:12px;overflow:hidden">
+    <div style="background:linear-gradient(135deg,#111,#1a2633);padding:16px 20px;display:flex;justify-content:space-between;align-items:center">
+      <h3 style="margin:0;color:#D4AC0D;font-size:1rem" id="modalTitle">新闻摘要</h3>
+      <button onclick="document.getElementById('newsModal').style.display='none'" style="background:transparent;border:none;color:#888;font-size:1.3rem;cursor:pointer">✕</button>
+    </div>
+    <div style="padding:24px" id="modalBody"><div style="text-align:center;color:#555;padding:40px">加载中...</div></div>
+  </div>
+</div>
+
+<script>
+function switchTab(name, btn) {
+  document.querySelectorAll('.intel-tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.intel-tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+function toggleConfig() {
+  const p = document.getElementById('configPanel');
+  p.classList.toggle('open');
+}
+async function loadNewsDetail(id) {
+  document.getElementById('newsModal').style.display = 'block';
+  document.getElementById('modalBody').innerHTML = '<div style="text-align:center;color:#555;padding:40px">加载中...</div>';
+  try {
+    const r = await fetch('/scoreboard/intelligence/news/' + id);
+    const d = await r.json();
+    document.getElementById('modalTitle').textContent = d.session_type + ' · ' + new Date(d.fetched_at).toLocaleString('zh-CN',{timeZone:'America/Los_Angeles'}) + ' PST';
+    document.getElementById('modalBody').innerHTML = '<pre style="white-space:pre-wrap;color:#ccc;font-size:.85rem;line-height:1.9">' + (d.summary || '') + '</pre>';
+  } catch(e) {
+    document.getElementById('modalBody').innerHTML = '<div style="color:#e74c3c;padding:20px">加载失败</div>';
+  }
+}
+</script>
+</body>
+</html>
+
+<%# Helper function to render markdown-like text as HTML %>
+<% function formatMd(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^## (.+)$/gm,  '<h2>$1</h2>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^• (.+)$/gm,  '<div style="padding:2px 0">• $1</div>')
+    .replace(/^  • (.+)$/gm,'<div style="padding:2px 0;padding-left:18px">• $1</div>')
+    .replace(/\*(.+?)\*/g, '<em style="color:#aaa">$1</em>')
+    .replace(/\n/g,'<br>');
+} %>

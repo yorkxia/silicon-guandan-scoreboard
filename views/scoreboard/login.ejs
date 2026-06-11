@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>流量系统登录 | Scoreboard Monitor Login</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .sb-login-page { min-height:100vh; background:linear-gradient(135deg,#0a0a0a 0%,#1a1a2e 50%,#16213e 100%); display:flex; align-items:center; justify-content:center; }
+    .sb-login-card { background:rgba(255,255,255,0.05); border:1px solid rgba(212,172,13,0.3); border-radius:12px; padding:40px; width:380px; max-width:90vw; backdrop-filter:blur(10px); }
+    .sb-login-logo { text-align:center; margin-bottom:28px; }
+    .sb-login-logo h2 { color:#D4AC0D; font-size:1.4rem; margin:12px 0 4px; }
+    .sb-login-logo p { color:#888; font-size:0.82rem; }
+    .sb-login-logo .sb-icon { font-size:2.8rem; }
+    .sb-assoc-logo { width:100px; height:100px; border-radius:50%; border:3px solid #D4AC0D; box-shadow:0 0 28px rgba(212,172,13,0.5); object-fit:cover; background:#fff; padding:2px; display:block; margin:0 auto 14px; }
+  </style>
+</head>
+<body>
+<div class="sb-login-page">
+  <div style="position:absolute;top:10%;left:8%;font-size:3rem;color:rgba(212,172,13,0.08);pointer-events:none">♠</div>
+  <div style="position:absolute;bottom:12%;right:10%;font-size:4rem;color:rgba(212,172,13,0.06);pointer-events:none">♥</div>
+
+  <div class="sb-login-card">
+    <div class="sb-login-logo">
+      <img src="/img/assoc-logo.png" alt="硅谷掼蛋协会" class="sb-assoc-logo">
+      <h2>流量系统登录</h2>
+      <p>Scoreboard Monitor · Silicon Valley Guandan</p>
+    </div>
+
+    <% if (error && error.length > 0) { %>
+      <div class="flash-wrap">
+        <% error.forEach(function(m) { %>
+          <div class="flash flash-error"><%= m %></div>
+        <% }) %>
+      </div>
+    <% } %>
+    <% if (success && success.length > 0) { %>
+      <div class="flash-wrap">
+        <% success.forEach(function(m) { %>
+          <div class="flash flash-success"><%= m %></div>
+        <% }) %>
+      </div>
+    <% } %>
+
+    <form action="/scoreboard/login" method="POST">
+      <div class="a-form-group">
+        <label for="username" style="color:#ccc">用户名 · Username</label>
+        <input type="text" id="username" name="username" class="a-input" placeholder="请输入用户名" required autocomplete="username">
+      </div>
+      <div class="a-form-group">
+        <label for="password" style="color:#ccc">密码 · Password</label>
+        <input type="password" id="password" name="password" class="a-input" placeholder="请输入密码" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-red btn-full" style="margin-top:6px; font-size:0.97rem; padding:13px; background:linear-gradient(135deg,#D4AC0D,#F0C820); color:#000; border:none;">
+        🔐 登录 · Login
+      </button>
+    </form>
+
+    <div style="margin-top:20px; text-align:center">
+      <a href="/" style="font-size:0.82rem; color:#666; text-decoration:none">← 返回网站首页 · Back to Site</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>

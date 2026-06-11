@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>区域管理 | Region Management</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/scoreboard-admin.css">
+</head>
+<body>
+<% const activePage = 'regions'; %>
+<div class="sb-wrap">
+  <%- include('_layout', { activePage }) %>
+
+  <main class="sb-main">
+    <div class="sb-page-head">
+      <h1>🗺️ 区域管理 · Region Management</h1>
+    </div>
+
+    <% if (error && error.length > 0) { %>
+      <div class="flash-wrap"><% error.forEach(function(m) { %><div class="flash flash-error"><%= m %></div><% }) %></div>
+    <% } %>
+    <% if (success && success.length > 0) { %>
+      <div class="flash-wrap"><% success.forEach(function(m) { %><div class="flash flash-success"><%= m %></div><% }) %></div>
+    <% } %>
+
+    <div class="a-card">
+      <h3 style="margin:0 0 16px; color:#D4AC0D">所有区域 (<%= regions.length %>)</h3>
+      <table class="a-table">
+        <thead>
+          <tr>
+            <th>区域代码</th><th>中文名</th><th>英文名</th><th>国家</th><th>主要城市</th><th>负责人</th><th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% regions.forEach(function(r) { %>
+            <tr>
+              <td><strong style="color:#D4AC0D"><%= r.area_code %></strong></td>
+              <td><%= r.area_name_zh %></td>
+              <td><%= r.area_name_en %></td>
+              <td><%= r.country %></td>
+              <td style="font-size:0.78rem; color:#888"><%= r.cities || '-' %></td>
+              <td>
+                <% if (r.assigned_username) { %>
+                  <span style="color:#4CAF50"><%= r.assigned_username %></span>
+                <% } else { %>
+                  <span style="color:#666">未分配</span>
+                <% } %>
+              </td>
+              <td>
+                <form action="/scoreboard/regions/<%= r.id %>/assign" method="POST" style="display:flex; gap:6px; align-items:center">
+                  <select name="user_id" class="a-input" style="padding:4px 8px; font-size:0.8rem; width:auto">
+                    <option value="">-- 不分配 --</option>
+                    <% users.forEach(function(u) { %>
+                      <option value="<%= u.id %>" <%= r.assigned_user_id === u.id ? 'selected' : '' %>><%= u.display_name || u.username %></option>
+                    <% }) %>
+                  </select>
+                  <button type="submit" class="abtn abtn-primary" style="font-size:0.78rem; padding:4px 10px">保存</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+</body>
+</html>

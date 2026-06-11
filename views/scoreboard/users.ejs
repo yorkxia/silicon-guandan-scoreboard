@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>用户管理 | User Management</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/scoreboard-admin.css">
+</head>
+<body>
+<% const activePage = 'users'; %>
+<div class="sb-wrap">
+  <%- include('_layout', { activePage }) %>
+
+  <main class="sb-main">
+    <div class="sb-page-head">
+      <h1>👥 用户管理 · User Management</h1>
+    </div>
+
+    <% if (error && error.length > 0) { %>
+      <div class="flash-wrap"><% error.forEach(function(m) { %><div class="flash flash-error"><%= m %></div><% }) %></div>
+    <% } %>
+    <% if (success && success.length > 0) { %>
+      <div class="flash-wrap"><% success.forEach(function(m) { %><div class="flash flash-success"><%= m %></div><% }) %></div>
+    <% } %>
+
+    <!-- Add User Form -->
+    <div class="a-card" style="margin-bottom:24px">
+      <h3 style="margin:0 0 16px; color:#D4AC0D">➕ 新增用户</h3>
+      <form action="/scoreboard/users/add" method="POST">
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:12px">
+          <div class="a-form-group" style="margin:0">
+            <label>用户名 *</label>
+            <input type="text" name="username" class="a-input" placeholder="登录用户名" required>
+          </div>
+          <div class="a-form-group" style="margin:0">
+            <label>密码 *</label>
+            <input type="password" name="password" class="a-input" placeholder="初始密码" required>
+          </div>
+          <div class="a-form-group" style="margin:0">
+            <label>显示名称</label>
+            <input type="text" name="display_name" class="a-input" placeholder="显示名称">
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 2fr; gap:12px; margin-bottom:16px">
+          <div class="a-form-group" style="margin:0">
+            <label>角色</label>
+            <select name="role" class="a-input">
+              <option value="regional">区域用户</option>
+              <option value="admin">管理员</option>
+            </select>
+          </div>
+          <div class="a-form-group" style="margin:0">
+            <label>管辖区域（可多选）</label>
+            <select name="region_ids" multiple class="a-input" style="height:80px">
+              <% regions.forEach(function(r) { %>
+                <option value="<%= r.id %>"><%= r.area_code %> · <%= r.area_name_zh %></option>
+              <% }) %>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="abtn abtn-primary">➕ 创建用户</button>
+      </form>
+    </div>
+
+    <!-- Users Table -->
+    <div class="a-card">
+      <h3 style="margin:0 0 16px; color:#D4AC0D">所有用户 (<%= users.length %>)</h3>
+      <table class="a-table">
+        <thead>
+          <tr>
+            <th>ID</th><th>用户名</th><th>显示名</th><th>角色</th><th>状态</th><th>管辖区域</th><th>创建时间</th><th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% users.forEach(function(u) { %>
+            <%
+              const myRegions = userRegions
+                .filter(ur => ur.user_id === u.id)
+                .map(ur => { const r = regions.find(x => x.id === ur.region_id); return r ? r.area_code : ur.region_id; })
+                .join(', ');
+            %>
+            <tr>
+              <td><%= u.id %></td>
+              <td><strong><%= u.username %></strong></td>
+              <td><%= u.display_name || '-' %></td>
+              <td>
+                <span style="background:<%= u.role==='admin' ? '#D4AC0D' : '#3a6' %>; color:<%= u.role==='admin' ? '#000' : '#fff' %>; padding:2px 8px; border-radius:12px; font-size:0.75rem">
+                  <%= u.role === 'admin' ? '管理员' : '区域用户' %>
+                </span>
+              </td>
+              <td>
+                <span style="color:<%= u.is_active ? '#4CAF50' : '#e53' %>">
+                  <%= u.is_active ? '✅ 启用' : '⛔ 禁用' %>
+                </span>
+              </td>
+              <td style="font-size:0.8rem; color:#888"><%= myRegions || '-' %></td>
+              <td style="font-size:0.78rem; color:#666"><%= new Date(u.created_at).toLocaleDateString('zh-CN') %></td>
+              <td>
+                <% if (u.username !== 'sbadmin') { %>
+                  <form action="/scoreboard/users/<%= u.id %>/toggle" method="POST" style="display:inline">
+                    <button type="submit" class="abtn" style="font-size:0.75rem; padding:4px 10px; background:<%= u.is_active ? '#e74c3c' : '#27ae60' %>; color:#fff; border:none; cursor:pointer">
+                      <%= u.is_active ? '禁用' : '启用' %>
+                    </button>
+                  </form>
+                  <form action="/scoreboard/users/<%= u.id %>/delete" method="POST" style="display:inline" onsubmit="return confirm('确认删除用户 <%= u.username %>?')">
+                    <button type="submit" class="abtn" style="font-size:0.75rem; padding:4px 10px; background:#555; color:#fff; border:none; cursor:pointer">删除</button>
+                  </form>
+                <% } else { %>
+                  <span style="color:#555; font-size:0.78rem">系统用户</span>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+</body>
+</html>
