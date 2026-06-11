@@ -33,10 +33,11 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/', (req, res) => res.redirect('/scoreboard/login'));
-
 app.use('/scoreboard', scoreboardRoutes);
 app.use('/scoreboard/intelligence', intelligenceRoutes);
+
+app.get('/', (req, res) => res.redirect('/scoreboard/login'));
+app.use((req, res) => res.redirect('/scoreboard/login'));
 
 const PORT = process.env.PORT || 3001;
 initDB().then(async () => {
