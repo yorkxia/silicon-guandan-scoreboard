@@ -5,6 +5,11 @@
     <div style="font-size:0.8rem; color:#D4AC0D; margin-top:4px">监控系统</div>
   </div>
   <ul class="sb-nav">
+    <% if (sbUser.role === 'admin') { %>
+    <li class="<%= locals.activePage ==='gdo' ? 'active' : '' %>">
+      <a href="/scoreboard/gdo">🎮 网上掼蛋赛事控制台</a>
+    </li>
+    <% } %>
     <li class="<%= locals.activePage ==='dashboard' ? 'active' : '' %>">
       <a href="/scoreboard/dashboard">🏠 控制台</a>
     </li>
