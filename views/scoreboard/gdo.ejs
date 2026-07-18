@@ -60,6 +60,14 @@
     .g-seat .afk { font-size:0.64rem; color:#ffb74d; font-weight:700; }
     .g-empty { color:#777; font-size:0.85rem; padding:18px 4px; text-align:center; }
 
+    /* ── 房间流水 ── */
+    .hrow { cursor:pointer; }
+    .hrow:hover td { background:rgba(212,172,13,0.06); }
+    .g-detail-btn { color:#D4AC0D; font-size:0.72rem; white-space:nowrap; }
+    .hdetail { display:none; }
+    .hdetail.open { display:table-row; }
+    .hdetail td { background:#111 !important; padding:6px 10px; }
+
     .g-refresh { font-size:0.76rem; color:#777; display:flex; align-items:center; gap:6px; }
     .g-refresh .rdot { width:8px; height:8px; border-radius:50%; background:#4CAF50; box-shadow:0 0 6px #4CAF50; animation:pulse-green 1.6s ease-in-out infinite; }
     @keyframes pulse-green { 0%,100%{opacity:1} 50%{opacity:0.5} }
@@ -73,13 +81,15 @@
   <main class="sb-main">
     <div class="sb-page-head" style="display:flex; align-items:center; justify-content:space-between;">
       <h1>🎮 网上掼蛋赛事控制台</h1>
-      <span class="g-refresh"><span class="rdot"></span>自动刷新 · <span id="g-updated">刚刚</span></span>
+      <span class="g-refresh"><span class="rdot"></span>实时页自动刷新 · <span id="g-updated">刚刚</span></span>
     </div>
 
     <div class="g-tabs">
       <div class="g-tab active" data-pane="overview">📊 总览</div>
       <div class="g-tab" data-pane="live">🟢 实时对局</div>
       <div class="g-tab" data-pane="players">👤 玩家档案</div>
+      <div class="g-tab" data-pane="history">🗂️ 房间流水</div>
+      <div class="g-tab" data-pane="stats">📈 数据统计</div>
     </div>
 
     <!-- 总览 -->
@@ -115,7 +125,7 @@
       <div class="a-card">
         <h3 style="margin:0 0 14px; color:#D4AC0D">👤 活跃玩家（按最近活跃排序 · 前 50）</h3>
         <div style="overflow-x:auto">
-          <table class="a-table" id="players-table" style="font-size:0.85rem">
+          <table class="a-table" style="font-size:0.85rem">
             <thead>
               <tr><th>状态</th><th>昵称</th><th>总局数</th><th>胜局</th><th>胜率</th><th>最近活跃</th></tr>
             </thead>
@@ -124,6 +134,34 @@
         </div>
       </div>
     </section>
+
+    <!-- 房间流水 -->
+    <section class="g-pane" id="pane-history">
+      <div class="g-two">
+        <div class="a-card g-side-4p">
+          <div class="g-side-title">🀄 四人 · 房间流水
+            <a href="/scoreboard/gdo/export?mode=4p" class="abtn abtn-secondary" style="font-size:0.72rem;padding:3px 10px;margin-left:auto">⬇ 导出CSV</a>
+          </div>
+          <div style="overflow-x:auto" id="hist-4p"><div class="g-empty">加载中…</div></div>
+        </div>
+        <div class="a-card g-side-6p">
+          <div class="g-side-title">🎴 六人 · 房间流水
+            <a href="/scoreboard/gdo/export?mode=6p" class="abtn abtn-secondary" style="font-size:0.72rem;padding:3px 10px;margin-left:auto">⬇ 导出CSV</a>
+          </div>
+          <div style="overflow-x:auto" id="hist-6p"><div class="g-empty">加载中…</div></div>
+        </div>
+      </div>
+      <p style="color:#666;font-size:0.76rem;margin-top:10px">💡 点击任意一行可展开该房逐局明细（大胜/小胜/末胜、升级结果）。列表最多显示最近 100 局房间。</p>
+    </section>
+
+    <!-- 数据统计 -->
+    <section class="g-pane" id="pane-stats">
+      <div class="g-two">
+        <div class="a-card g-side-4p"><div class="g-side-title">🀄 四人 · 数据统计</div><div id="stats-4p"><div class="g-empty">加载中…</div></div></div>
+        <div class="a-card g-side-6p"><div class="g-side-title">🎴 六人 · 数据统计</div><div id="stats-6p"><div class="g-empty">加载中…</div></div></div>
+      </div>
+      <p style="color:#666;font-size:0.76rem;margin-top:10px">💡 趋势基于对局时间聚合（近 14 天每日开局数）。地域分布需在游戏端 play 页面加访问埋点后才有数据，暂未接入。</p>
+    </section>
   </main>
 </div>
 
@@ -131,9 +169,10 @@
   var INITIAL = <%- JSON.stringify(snap).replace(/</g, '\\u003c') %>;
 
   var LEVELS = {2:'2',3:'3',4:'4',5:'5',6:'6',7:'7',8:'8',9:'9',10:'10',11:'J',12:'Q',13:'K',14:'A'};
-  function lvl(n){ return LEVELS[n] || n; }
+  function lvl(n){ return LEVELS[n] || (n==null?'—':n); }
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function roomTypeLabel(t){ return t === 'private' ? '私人' : t === 'tournament' ? '赛事' : '随机'; }
+  function statusLabel(s){ return s==='finished'?'已完赛' : s==='abandoned'?'已关闭' : s==='playing'?'进行中' : '等待中'; }
   function ago(iso){
     if(!iso) return '—';
     var s = Math.floor((Date.now() - new Date(iso).getTime())/1000);
@@ -142,72 +181,57 @@
     if(s < 86400) return Math.floor(s/3600) + '小时';
     return Math.floor(s/86400) + '天';
   }
+  function fmtDur(sec){
+    sec = parseInt(sec,10) || 0;
+    if(sec < 60) return sec + '秒';
+    if(sec < 3600) return Math.floor(sec/60) + '分';
+    return Math.floor(sec/3600) + '时' + Math.floor((sec%3600)/60) + '分';
+  }
+  function tstamp(iso, opt){ return iso ? new Date(iso).toLocaleString('zh-CN', opt || {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'; }
 
+  /* ── 实时：KPI / 房间 / 玩家 ── */
   function kpiHtml(k){
     k = k || {};
     function box(val, lbl, hot){ return '<div class="g-kpi'+(hot?' hot':'')+'"><b>'+(val||0)+'</b><span>'+lbl+'</span></div>'; }
-    return box(k.online_players, '在线玩家', true)
-         + box(k.active_rooms,   '活跃房间', true)
-         + box(k.playing_rooms,  '进行中')
-         + box(k.queue_waiting,  '排队中')
-         + box(k.rooms_today,    '今日开局')
-         + box(k.rounds_today,   '今日完局')
-         + box(k.offline_seats,  '掉线托管');
+    return box(k.online_players,'在线玩家',true) + box(k.active_rooms,'活跃房间',true) + box(k.playing_rooms,'进行中')
+         + box(k.queue_waiting,'排队中') + box(k.rooms_today,'今日开局') + box(k.rounds_today,'今日完局')
+         + box(k.offline_seats,'掉线托管');
   }
-
   function roomHtml(r){
     var seats = (r.seats || []).map(function(s){
       var on = s.is_connected;
       return '<span class="g-seat t'+s.team+(on?'':' off-seat')+'">'
            + '<span class="sdot '+(on?'on':'off')+'"></span>'
            + '<span class="nm">'+esc(s.display_name)+'</span>'
-           + (on ? '' : '<span class="afk">托管</span>')
-           + '</span>';
+           + (on ? '' : '<span class="afk">托管</span>') + '</span>';
     }).join('');
     if(!seats) seats = '<span style="color:#888;font-size:0.75rem">暂无座位</span>';
-    var statusCls = r.status === 'playing' ? 'playing' : 'waiting';
-    var statusTxt = r.status === 'playing' ? '进行中' : '等待中';
+    var cls = r.status === 'playing' ? 'playing' : 'waiting';
     return '<div class="g-room">'
-      + '<div class="g-room-head">'
-      +   '<span class="g-room-code">'+esc(r.room_code)+'</span>'
-      +   '<span>'
-      +     '<span class="g-chip type">'+roomTypeLabel(r.room_type)+'</span> '
-      +     '<span class="g-chip '+statusCls+'">'+statusTxt+'</span>'
-      +   '</span>'
-      + '</div>'
+      + '<div class="g-room-head"><span class="g-room-code">'+esc(r.room_code)+'</span>'
+      +   '<span><span class="g-chip type">'+roomTypeLabel(r.room_type)+'</span> '
+      +   '<span class="g-chip '+cls+'">'+statusLabel(r.status)+'</span></span></div>'
       + '<div class="g-room-meta">'
       +   '<span>级牌 <b>甲 '+lvl(r.level_team1)+'</b> · <b>乙 '+lvl(r.level_team2)+'</b></span>'
       +   '<span>盘胜 <b>'+(r.wins_team1||0)+' : '+(r.wins_team2||0)+'</b></span>'
       +   '<span>已打 <b>'+(r.round_count||0)+'</b> 局</span>'
-      +   '<span>时长 <b>'+ago(r.started_at || r.created_at)+'</b></span>'
-      + '</div>'
-      + '<div class="g-seats">'+seats+'</div>'
-      + '</div>';
+      +   '<span>时长 <b>'+ago(r.started_at || r.created_at)+'</b></span></div>'
+      + '<div class="g-seats">'+seats+'</div></div>';
   }
-
   function roomsHtml(rooms){
     if(!rooms || !rooms.length) return '<div class="g-empty">当前没有活跃房间</div>';
     return rooms.map(roomHtml).join('');
   }
-
   function playersHtml(players){
     if(!players || !players.length) return '<tr><td colspan="6" style="color:#777;text-align:center;padding:16px">暂无玩家数据</td></tr>';
     return players.map(function(p){
-      var dot = p.active_now
-        ? '<span style="color:#4CAF50;font-size:0.72rem;font-weight:700">● 在线</span>'
-        : '<span style="color:#666;font-size:0.72rem">○ 离线</span>';
-      return '<tr>'
-        + '<td>'+dot+'</td>'
-        + '<td>'+esc(p.display_name)+'</td>'
-        + '<td>'+(p.games_played||0)+'</td>'
-        + '<td>'+(p.games_won||0)+'</td>'
-        + '<td>'+(p.win_rate||0)+'%</td>'
-        + '<td>'+ago(p.last_active_at)+'前</td>'
-        + '</tr>';
+      var dot = p.active_now ? '<span style="color:#4CAF50;font-size:0.72rem;font-weight:700">● 在线</span>'
+                             : '<span style="color:#666;font-size:0.72rem">○ 离线</span>';
+      return '<tr><td>'+dot+'</td><td>'+esc(p.display_name)+'</td><td>'+(p.games_played||0)+'</td>'
+        + '<td>'+(p.games_won||0)+'</td><td>'+(p.win_rate||0)+'%</td><td>'+ago(p.last_active_at)+'前</td></tr>';
     }).join('');
   }
-
-  function render(data){
+  function renderLive(data){
     document.getElementById('kpi-4p').innerHTML = kpiHtml(data.four.kpi);
     document.getElementById('kpi-6p').innerHTML = kpiHtml(data.six.kpi);
     document.getElementById('rooms-4p').innerHTML = roomsHtml(data.four.rooms);
@@ -218,23 +242,125 @@
     document.getElementById('g-updated').textContent = new Date().toLocaleTimeString('zh-CN');
   }
 
-  // 标签页切换
+  /* ── 房间流水 + 逐局明细 ── */
+  function histTable(rows, mode){
+    if(!rows || !rows.length) return '<div class="g-empty">暂无房间记录</div>';
+    var body = rows.map(function(r){
+      return '<tr class="hrow" data-mode="'+mode+'" data-id="'+r.id+'">'
+        + '<td><b>'+esc(r.room_code)+'</b></td><td>'+roomTypeLabel(r.room_type)+'</td><td>'+statusLabel(r.status)+'</td>'
+        + '<td>甲'+lvl(r.level_team1)+' / 乙'+lvl(r.level_team2)+'</td><td>'+(r.round_count||0)+'</td>'
+        + '<td>'+(r.wins_team1||0)+':'+(r.wins_team2||0)+'</td><td>'+fmtDur(r.dur_sec)+'</td>'
+        + '<td style="white-space:nowrap">'+tstamp(r.created_at)+'</td><td><span class="g-detail-btn">明细▾</span></td></tr>'
+        + '<tr class="hdetail" id="hd-'+mode+'-'+r.id+'"><td colspan="9"></td></tr>';
+    }).join('');
+    return '<table class="a-table" style="font-size:0.8rem"><thead><tr>'
+      + '<th>房号</th><th>类型</th><th>状态</th><th>级牌</th><th>局</th><th>盘胜</th><th>时长</th><th>时间</th><th></th>'
+      + '</tr></thead><tbody>'+body+'</tbody></table>';
+  }
+  function roundsHtml(rounds){
+    if(!rounds || !rounds.length) return '<span style="color:#888;font-size:0.75rem">暂无逐局记录</span>';
+    var rows = rounds.map(function(n){
+      var win = n.winner_team===1?'甲胜' : n.winner_team===2?'乙胜' : '—';
+      return '<tr><td>第'+n.round_number+'局</td><td>'+win+'</td><td>'+(n.result_type||'—')+'</td>'
+        + '<td>甲'+lvl(n.level_team1_after)+' / 乙'+lvl(n.level_team2_after)+'</td>'
+        + '<td>'+tstamp(n.finished_at,{hour:'2-digit',minute:'2-digit'})+'</td></tr>';
+    }).join('');
+    return '<table class="a-table" style="font-size:0.74rem;margin:2px 0"><thead><tr>'
+      + '<th>局</th><th>胜方</th><th>结果</th><th>升级后</th><th>结束</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  }
+  function bindHistRows(){
+    document.querySelectorAll('.hrow').forEach(function(row){
+      row.addEventListener('click', function(){
+        var mode = row.dataset.mode, id = row.dataset.id;
+        var dr = document.getElementById('hd-'+mode+'-'+id);
+        if(dr.classList.contains('open')){ dr.classList.remove('open'); dr.firstElementChild.innerHTML=''; return; }
+        dr.firstElementChild.innerHTML = '<span style="color:#888;font-size:0.74rem">加载中…</span>';
+        dr.classList.add('open');
+        fetch('/scoreboard/gdo/room/'+mode+'/'+id).then(function(r){return r.json();}).then(function(d){
+          dr.firstElementChild.innerHTML = d && !d.error ? roundsHtml(d.rounds) : '加载失败';
+        }).catch(function(){ dr.firstElementChild.innerHTML = '加载失败'; });
+      });
+    });
+  }
+  function loadHistory(){
+    fetch('/scoreboard/gdo/data/history').then(function(r){return r.json();}).then(function(d){
+      if(!d || d.error) return;
+      document.getElementById('hist-4p').innerHTML = histTable(d.four, '4p');
+      document.getElementById('hist-6p').innerHTML = histTable(d.six, '6p');
+      bindHistRows();
+    }).catch(function(){});
+  }
+
+  /* ── 数据统计（趋势）· small multiples ── */
+  function barsHtml(daily, color){
+    if(!daily || !daily.length) return '<div class="g-empty">暂无数据</div>';
+    var max = Math.max.apply(null, daily.map(function(x){return x.rooms;}).concat([1]));
+    var bars = daily.map(function(x, i){
+      var h = Math.round(x.rooms / max * 76);
+      var showNum = x.rooms > 0 && (i === daily.length-1 || x.rooms === max);
+      var num = showNum ? '<span style="position:absolute;top:0;left:50%;transform:translateX(-50%);font-size:0.62rem;color:#bbb">'+x.rooms+'</span>' : '';
+      var hideLbl = daily.length > 10 && (i % 2 === 1);
+      return '<div title="'+x.d+'：'+x.rooms+' 局" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;position:relative;height:96px">'
+        + num
+        + '<div style="width:70%;height:'+h+'px;min-height:'+(x.rooms>0?3:0)+'px;background:'+color+';border-radius:4px 4px 0 0"></div>'
+        + '<span style="font-size:0.55rem;color:#666;margin-top:3px;'+(hideLbl?'visibility:hidden':'')+'">'+x.d+'</span></div>';
+    }).join('');
+    return '<div style="display:flex;align-items:flex-end;gap:2px;padding-top:16px">'+bars+'</div>';
+  }
+  function typeBars(byType, color){
+    if(!byType || !byType.length) return '';
+    var total = byType.reduce(function(a,b){return a + b.c;}, 0) || 1;
+    var rows = byType.map(function(x){
+      var pct = Math.round(x.c * 100 / total);
+      return '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:0.74rem">'
+        + '<span style="width:40px;color:#aaa">'+roomTypeLabel(x.room_type)+'</span>'
+        + '<div style="flex:1;background:#222;border-radius:4px;overflow:hidden;height:10px"><div style="width:'+pct+'%;height:100%;background:'+color+';border-radius:4px"></div></div>'
+        + '<span style="width:60px;text-align:right;color:#ccc">'+x.c+'（'+pct+'%）</span></div>';
+    }).join('');
+    return '<div style="margin-top:16px"><div style="font-size:0.76rem;color:#888;margin-bottom:2px">房间类型分布</div>'+rows+'</div>';
+  }
+  function statsCard(s, color){
+    var t = s.totals || {};
+    var finRate = t.total_rooms > 0 ? Math.round(t.finished_rooms * 100 / t.total_rooms) : 0;
+    var kpis = '<div class="g-kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px">'
+      + '<div class="g-kpi"><b>'+(t.total_rooms||0)+'</b><span>累计房间</span></div>'
+      + '<div class="g-kpi"><b>'+finRate+'%</b><span>完赛率</span></div>'
+      + '<div class="g-kpi"><b>'+(t.abandoned_rooms||0)+'</b><span>已关闭</span></div>'
+      + '<div class="g-kpi"><b>'+fmtDur(s.avg_round_sec)+'</b><span>平均每局</span></div></div>';
+    return kpis + '<div style="font-size:0.76rem;color:#888;margin-bottom:2px">近 14 天每日开局</div>'
+      + barsHtml(s.daily, color) + typeBars(s.byType, color);
+  }
+  function loadStats(){
+    fetch('/scoreboard/gdo/data/stats?days=14').then(function(r){return r.json();}).then(function(d){
+      if(!d || d.error) return;
+      document.getElementById('stats-4p').innerHTML = statsCard(d.four, '#C0392B');
+      document.getElementById('stats-6p').innerHTML = statsCard(d.six, '#1565C0');
+    }).catch(function(){});
+  }
+
+  /* ── 标签页切换（房间流水/统计首次进入时懒加载） ── */
+  var loaded = { history:false, stats:false };
+  function onSwitch(pane){
+    if(pane === 'history' && !loaded.history){ loaded.history = true; loadHistory(); }
+    if(pane === 'stats'   && !loaded.stats){   loaded.stats   = true; loadStats(); }
+  }
   document.querySelectorAll('.g-tab').forEach(function(t){
     t.addEventListener('click', function(){
       document.querySelectorAll('.g-tab').forEach(function(x){ x.classList.remove('active'); });
       document.querySelectorAll('.g-pane').forEach(function(x){ x.classList.remove('active'); });
       t.classList.add('active');
       document.getElementById('pane-' + t.dataset.pane).classList.add('active');
+      onSwitch(t.dataset.pane);
     });
   });
 
-  // 首屏 + 定时刷新
-  render(INITIAL);
+  /* ── 首屏 + 实时轮询（仅实时数据，8 秒） ── */
+  renderLive(INITIAL);
   setInterval(function(){
     fetch('/scoreboard/gdo/api', { headers:{ 'Accept':'application/json' } })
       .then(function(r){ return r.ok ? r.json() : null; })
-      .then(function(d){ if(d && !d.error) render(d); })
-      .catch(function(){ /* 静默：下次再试 */ });
+      .then(function(d){ if(d && !d.error) renderLive(d); })
+      .catch(function(){});
   }, 8000);
 </script>
 </body>
