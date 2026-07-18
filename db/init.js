@@ -310,4 +310,4 @@ async function initDB() {
   console.log('✅ Database initialized');
 }
 
-module.exports = { query, queryOne, initDB };
+module.exports = { query, queryOne, initDB, pool };

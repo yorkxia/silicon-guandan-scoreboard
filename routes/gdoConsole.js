@@ -5,7 +5,7 @@
    玩家表 gdo_players 四人六人共用。 */
 const express = require('express');
 const router = express.Router();
-const { query } = require('../db/init');
+const { query, pool } = require('../db/init');
 const { requireSbAuth, requireSbAdmin } = require('../middleware/sbAuth');
 
 // 全局管理员才能进网上掼蛋赛事控制台
@@ -215,6 +215,105 @@ router.get('/export', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="gdo_${mode}_rooms_${Date.now()}.csv"`);
     res.send(csv);
   } catch (e) { console.error('[控制台/导出]', e.message); res.status(500).send('导出失败: ' + e.message); }
+});
+
+/* ════════════ 系统备份与恢复（仅管理员；控制台已 requireSbAdmin） ════════════ */
+
+// 绿灯清理计划：与游戏端 scripts/db-maintain.js 完全一致；红线表不出现在任何 DELETE
+const GREENLIGHT = [
+  { name: '四人·已结束老房间(座位/轮次级联删)',
+    count: `SELECT COUNT(*)::int AS c FROM gdo_rooms WHERE status IN ('finished','abandoned') AND COALESCE(finished_at,created_at) < $1`,
+    steps: [
+      `DELETE FROM gdo_queue WHERE room_id IN (SELECT id FROM gdo_rooms WHERE status IN ('finished','abandoned') AND COALESCE(finished_at,created_at) < $1)`,
+      `DELETE FROM gdo_rooms WHERE status IN ('finished','abandoned') AND COALESCE(finished_at,created_at) < $1`
+    ] },
+  { name: '六人·已结束老房间(座位/轮次级联删)',
+    count: `SELECT COUNT(*)::int AS c FROM gdo6_rooms WHERE status IN ('finished','abandoned') AND COALESCE(finished_at,created_at) < $1`,
+    steps: [
+      `DELETE FROM gdo6_queue WHERE room_id IN (SELECT id FROM gdo6_rooms WHERE status IN ('finished','abandoned') AND COALESCE(finished_at,created_at) < $1)`,
+      `DELETE FROM gdo6_rooms WHERE status IN ('finished','abandoned') AND COALESCE(finished_at,created_at) < $1`
+    ] },
+  { name: '四人·瞬态匹配队列(非等待中)',
+    count: `SELECT COUNT(*)::int AS c FROM gdo_queue WHERE status IN ('matched','cancelled','timeout') AND queued_at < $1`,
+    steps: [`DELETE FROM gdo_queue WHERE status IN ('matched','cancelled','timeout') AND queued_at < $1`] },
+  { name: '六人·瞬态匹配队列(非等待中)',
+    count: `SELECT COUNT(*)::int AS c FROM gdo6_queue WHERE status IN ('matched','cancelled','timeout') AND queued_at < $1`,
+    steps: [`DELETE FROM gdo6_queue WHERE status IN ('matched','cancelled','timeout') AND queued_at < $1`] },
+  { name: 'play页访问日志 gdo_visits',
+    count: `SELECT COUNT(*)::int AS c FROM gdo_visits WHERE visited_at < $1`,
+    steps: [`DELETE FROM gdo_visits WHERE visited_at < $1`] },
+  { name: '流量访问日志 sb_visits',
+    count: `SELECT COUNT(*)::int AS c FROM sb_visits WHERE visited_at < $1`,
+    steps: [`DELETE FROM sb_visits WHERE visited_at < $1`] },
+];
+
+// 全库 JSON 备份下载（导出所有表；供浏览器下载保存到本地）
+router.get('/backup', async (req, res) => {
+  try {
+    const tbls = await query(`SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename`);
+    const data = {};
+    for (const t of tbls) data[t.tablename] = await query(`SELECT * FROM "${t.tablename}"`);
+    const payload = {
+      meta: {
+        generated_at: new Date().toISOString(),
+        table_count: tbls.length,
+        note: '硅谷掼蛋全库备份(JSON)。registrations 等为加密字段，恢复需配合 ENCRYPTION_KEY。'
+      },
+      data
+    };
+    const fname = 'gdb_backup_' + new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14) + '.json';
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+    res.send(JSON.stringify(payload));
+  } catch (e) {
+    console.error('[控制台/备份]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 清理：dryRun 预览行数 / confirm==='DELETE' 才真正执行（单事务，失败回滚）
+router.post('/cleanup', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const months = parseInt(body.months, 10);
+    const dryRun = !!body.dryRun;
+    if (!months || months < 1) return res.status(400).json({ error: '请指定保留月数(≥1)' });
+    if (!dryRun && body.confirm !== 'DELETE') return res.status(400).json({ error: '确认词不正确，请输入 DELETE' });
+
+    const cut = await query(`SELECT (now() - make_interval(months => $1)) AS cutoff`, [months]);
+    const cutoff = cut[0].cutoff;
+
+    const items = [];
+    for (const it of GREENLIGHT) {
+      const r = await query(it.count, [cutoff]);
+      items.push({ name: it.name, n: r[0].c });
+    }
+    const total = items.reduce((a, b) => a + b.n, 0);
+
+    if (dryRun) return res.json({ dryRun: true, months, cutoff, items, total });
+
+    const client = await pool.connect();
+    let deleted = 0;
+    try {
+      await client.query('BEGIN');
+      for (const it of GREENLIGHT) {
+        for (const sql of it.steps) {
+          const r = await client.query(sql, [cutoff]);
+          deleted += r.rowCount || 0;
+        }
+      }
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+    res.json({ ok: true, months, deleted, total });
+  } catch (e) {
+    console.error('[控制台/清理]', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;
