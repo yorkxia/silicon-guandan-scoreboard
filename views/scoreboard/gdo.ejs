@@ -160,7 +160,7 @@
         <div class="a-card g-side-4p"><div class="g-side-title">🀄 四人 · 数据统计</div><div id="stats-4p"><div class="g-empty">加载中…</div></div></div>
         <div class="a-card g-side-6p"><div class="g-side-title">🎴 六人 · 数据统计</div><div id="stats-6p"><div class="g-empty">加载中…</div></div></div>
       </div>
-      <p style="color:#666;font-size:0.76rem;margin-top:10px">💡 趋势基于对局时间聚合（近 14 天每日开局数）。地域分布需在游戏端 play 页面加访问埋点后才有数据，暂未接入。</p>
+      <p style="color:#666;font-size:0.76rem;margin-top:10px">💡 趋势基于对局时间聚合（近 14 天每日开局数）；地域分布来自 play 入口页访问埋点，数据自埋点上线起累积。</p>
     </section>
   </main>
 </div>
@@ -319,6 +319,19 @@
     }).join('');
     return '<div style="margin-top:16px"><div style="font-size:0.76rem;color:#888;margin-bottom:2px">房间类型分布</div>'+rows+'</div>';
   }
+  function regionBars(byRegion, color){
+    if(!byRegion || !byRegion.length)
+      return '<div style="margin-top:16px;font-size:0.74rem;color:#666">📍 玩家地域分布：暂无数据（play 入口页埋点上线后开始累积）</div>';
+    var total = byRegion.reduce(function(a,b){return a + b.c;}, 0) || 1;
+    var rows = byRegion.map(function(x){
+      var pct = Math.round(x.c * 100 / total);
+      return '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:0.74rem">'
+        + '<span style="width:58px;color:#aaa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.region_code)+'</span>'
+        + '<div style="flex:1;background:#222;border-radius:4px;overflow:hidden;height:10px"><div style="width:'+pct+'%;height:100%;background:'+color+';border-radius:4px"></div></div>'
+        + '<span style="width:60px;text-align:right;color:#ccc">'+x.c+'（'+pct+'%）</span></div>';
+    }).join('');
+    return '<div style="margin-top:16px"><div style="font-size:0.76rem;color:#888;margin-bottom:2px">📍 玩家地域分布（近 14 天）</div>'+rows+'</div>';
+  }
   function statsCard(s, color){
     var t = s.totals || {};
     var finRate = t.total_rooms > 0 ? Math.round(t.finished_rooms * 100 / t.total_rooms) : 0;
@@ -328,7 +341,7 @@
       + '<div class="g-kpi"><b>'+(t.abandoned_rooms||0)+'</b><span>已关闭</span></div>'
       + '<div class="g-kpi"><b>'+fmtDur(s.avg_round_sec)+'</b><span>平均每局</span></div></div>';
     return kpis + '<div style="font-size:0.76rem;color:#888;margin-bottom:2px">近 14 天每日开局</div>'
-      + barsHtml(s.daily, color) + typeBars(s.byType, color);
+      + barsHtml(s.daily, color) + typeBars(s.byType, color) + regionBars(s.byRegion, color);
   }
   function loadStats(){
     fetch('/scoreboard/gdo/data/stats?days=14').then(function(r){return r.json();}).then(function(d){

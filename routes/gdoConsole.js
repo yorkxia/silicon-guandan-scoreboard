@@ -139,7 +139,17 @@ async function collectStats(m, days) {
     `),
     query(`SELECT room_type, COUNT(*)::int AS c FROM ${t.rooms} GROUP BY room_type ORDER BY c DESC`)
   ]);
-  return { daily, totals: totalsRows[0], avg_round_sec: roundAvgRows[0].avg_round_sec, byType };
+  let byRegion = [];
+  try {
+    byRegion = await query(`
+      SELECT COALESCE(NULLIF(region_code, ''), '未知') AS region_code, COUNT(*)::int AS c
+        FROM gdo_visits
+       WHERE game_mode = $1 AND visited_at >= CURRENT_DATE - ($2 || ' days')::interval
+       GROUP BY COALESCE(NULLIF(region_code, ''), '未知')
+       ORDER BY c DESC LIMIT 12
+    `, [m, days]);
+  } catch (e) { byRegion = []; }   // gdo_visits 尚未建表/无数据时静默降级
+  return { daily, totals: totalsRows[0], avg_round_sec: roundAvgRows[0].avg_round_sec, byType, byRegion };
 }
 
 /* ════════════ 路由 ════════════ */
