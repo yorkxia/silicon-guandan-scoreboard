@@ -75,6 +75,7 @@ async function collectSnapshot() {
     collectMode('6p'),
     query(`
       SELECT display_name, games_played, games_won, last_active_at,
+             source, country, region_code, city,
              (CASE WHEN games_played > 0 THEN ROUND(games_won * 100.0 / games_played) ELSE 0 END)::int AS win_rate,
              (last_active_at >= NOW() - INTERVAL '5 minutes') AS active_now
         FROM gdo_players

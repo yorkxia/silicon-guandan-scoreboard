@@ -155,7 +155,7 @@
         <div style="overflow-x:auto">
           <table class="a-table" style="font-size:0.85rem">
             <thead>
-              <tr><th>状态</th><th>昵称</th><th>总局数</th><th>胜局</th><th>胜率</th><th>最近活跃</th></tr>
+              <tr><th>状态</th><th>昵称</th><th>来源</th><th>国家</th><th>地区</th><th>城市</th><th>总局数</th><th>胜局</th><th>胜率</th><th>最近活跃</th></tr>
             </thead>
             <tbody id="players-body"></tbody>
           </table>
@@ -294,12 +294,18 @@
     if(!rooms || !rooms.length) return '<div class="g-empty">当前没有活跃房间</div>';
     return rooms.map(roomHtml).join('');
   }
+  var SOURCE_LABEL = { web:'网页', wechat:'微信', qr:'扫码' };
+  function srcLabel(s){ return s ? (SOURCE_LABEL[s] || esc(s)) : '—'; }
+  function orDash(v){ return (v==null || v==='') ? '—' : esc(v); }
   function playersHtml(players){
-    if(!players || !players.length) return '<tr><td colspan="6" style="color:#777;text-align:center;padding:16px">暂无玩家数据</td></tr>';
+    if(!players || !players.length) return '<tr><td colspan="10" style="color:#777;text-align:center;padding:16px">暂无玩家数据</td></tr>';
     return players.map(function(p){
       var dot = p.active_now ? '<span style="color:#4CAF50;font-size:0.72rem;font-weight:700">● 在线</span>'
                              : '<span style="color:#666;font-size:0.72rem">○ 离线</span>';
-      return '<tr><td>'+dot+'</td><td>'+esc(p.display_name)+'</td><td>'+(p.games_played||0)+'</td>'
+      return '<tr><td>'+dot+'</td><td>'+esc(p.display_name)+'</td>'
+        + '<td>'+srcLabel(p.source)+'</td><td>'+orDash(p.country)+'</td>'
+        + '<td>'+orDash(p.region_code)+'</td><td>'+orDash(p.city)+'</td>'
+        + '<td>'+(p.games_played||0)+'</td>'
         + '<td>'+(p.games_won||0)+'</td><td>'+(p.win_rate||0)+'%</td><td>'+ago(p.last_active_at)+'前</td></tr>';
     }).join('');
   }
