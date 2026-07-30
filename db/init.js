@@ -150,6 +150,16 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  // 广告媒体文件（从笔记本上传的图片/视频，存共享库；content_url 指向 /ad-media/<id>）
+  await query(`
+    CREATE TABLE IF NOT EXISTS sb_ad_media (
+      id SERIAL PRIMARY KEY,
+      mime TEXT NOT NULL,
+      data BYTEA NOT NULL,
+      size_bytes INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
   await query(`
     CREATE TABLE IF NOT EXISTS sb_visits (
       id SERIAL PRIMARY KEY,
@@ -222,6 +232,8 @@ async function initDB() {
 
   // 迁移：添加 frequency_minutes 列（如果不存在）
   await query(`ALTER TABLE sb_ads ADD COLUMN IF NOT EXISTS frequency_minutes INTEGER DEFAULT NULL`);
+  // 迁移：添加 placements 列（发布位置：scorer/play/home 逗号分隔；NULL/空=全部位置，兼容老广告）
+  await query(`ALTER TABLE sb_ads ADD COLUMN IF NOT EXISTS placements TEXT DEFAULT NULL`);
   // 迁移：添加 backup_partner_name_enc 列（如果不存在）
   await query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS backup_partner_name_enc TEXT`);
   // 迁移：添加 payment_type 列（如果不存在）

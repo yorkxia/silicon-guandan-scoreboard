@@ -91,6 +91,14 @@
             <input type="url" name="content_url" class="a-input" placeholder="图片直链，或视频：YouTube/Vimeo链接或 .mp4 直链">
           </div>
         </div>
+        <div class="a-form-group" style="margin:0 0 14px">
+          <label>发布位置（至少选一个，勾哪里就在哪里显示）</label>
+          <div style="display:flex; flex-wrap:wrap; gap:18px; margin-top:5px">
+            <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer"><input type="checkbox" name="placements" value="scorer" checked> 硅谷掼蛋计分器</label>
+            <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer"><input type="checkbox" name="placements" value="play" checked> 硅谷掼蛋协会网上赛事</label>
+            <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer"><input type="checkbox" name="placements" value="home" checked> 官网首页</label>
+          </div>
+        </div>
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:12px; margin-bottom:16px">
           <div class="a-form-group" style="margin:0">
             <label>点击跳转链接</label>
@@ -120,7 +128,7 @@
       <% if (ads.length > 0) { %>
       <table class="a-table">
         <thead>
-          <tr><th>ID</th><th>标题</th><th>类型</th><th>区域</th><th>状态</th><th>展示</th><th>点击</th><th>频率</th><th>有效期</th><th>操作</th></tr>
+          <tr><th>ID</th><th>标题</th><th>类型</th><th>区域</th><th>位置</th><th>状态</th><th>展示</th><th>点击</th><th>频率</th><th>有效期</th><th>操作</th></tr>
         </thead>
         <tbody>
           <% ads.forEach(function(ad) { %>
@@ -134,6 +142,10 @@
               </td>
               <td><span style="font-size:0.78rem; color:#aaa"><%= ad.content_type %></span></td>
               <td><%= ad.area_name_zh || '<span style="color:#666">全球</span>' %></td>
+              <td style="font-size:0.72rem; color:#bbb"><%
+                var _pl = (ad.placements || '').split(',').filter(Boolean);
+                var _PN = { scorer:'计分器', play:'网上赛事', home:'首页' };
+              %><%= _pl.length === 0 ? '全部' : _pl.map(function(p){ return _PN[p] || p; }).join('、') %></td>
               <td>
                 <span style="color:<%= ad.is_active ? '#4CAF50' : '#e53' %>">
                   <%= ad.is_active ? '✅ 启用' : '⛔ 暂停' %>
@@ -171,7 +183,8 @@
                     region_id: '<%= ad.region_id || "" %>',
                     start_time: '<%= ad.start_time ? new Date(ad.start_time).toISOString().slice(0,19).replace("T"," ") : "" %>',
                     end_time: '<%= ad.end_time ? new Date(ad.end_time).toISOString().slice(0,19).replace("T"," ") : "" %>',
-                    frequency_minutes: '<%= ad.frequency_minutes || "" %>'
+                    frequency_minutes: '<%= ad.frequency_minutes || "" %>',
+                    placements: <%= JSON.stringify(ad.placements || '') %>
                   })">✏️ 编辑</button>
                 <!-- 暂停/启用 -->
                 <form action="/scoreboard/ads/<%= ad.id %>/toggle" method="POST" style="display:inline">
@@ -237,6 +250,14 @@
           <input type="url" name="content_url" id="e_content_url" class="a-input" placeholder="图片直链，或视频：YouTube/Vimeo链接或 .mp4 直链">
         </div>
       </div>
+      <div class="a-form-group" style="margin:0 0 14px">
+        <label>发布位置（至少选一个，勾哪里就在哪里显示）</label>
+        <div style="display:flex; flex-wrap:wrap; gap:18px; margin-top:5px">
+          <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer"><input type="checkbox" name="placements" value="scorer" class="e_place"> 硅谷掼蛋计分器</label>
+          <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer"><input type="checkbox" name="placements" value="play" class="e_place"> 硅谷掼蛋协会网上赛事</label>
+          <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer"><input type="checkbox" name="placements" value="home" class="e_place"> 官网首页</label>
+        </div>
+      </div>
       <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:12px; margin-bottom:20px">
         <div class="a-form-group" style="margin:0">
           <label>点击跳转链接</label>
@@ -294,6 +315,13 @@ function openEdit(ad) {
 
   // 区域
   document.getElementById('e_region_id').value = ad.region_id;
+
+  // 发布位置：空=全部位置(老广告)→全勾；否则按存储勾选
+  var places = (ad.placements || '').split(',').filter(Boolean);
+  var all = places.length === 0;
+  document.querySelectorAll('.e_place').forEach(function(cb){
+    cb.checked = all || places.indexOf(cb.value) >= 0;
+  });
 
   // 时间（通过 flatpickr setDate）
   editFpStart.setDate(ad.start_time || null, false);

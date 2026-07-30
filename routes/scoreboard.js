@@ -5,6 +5,14 @@ const { query, queryOne } = require('../db/init');
 const { requireSbAuth, requireSbAdmin } = require('../middleware/sbAuth');
 const { ipHash, geoLocate } = require('../utils/geo');
 
+// 发布位置：scorer=计分器 / play=网上赛事 / home=官网首页。规整表单勾选为逗号分隔字符串（至少一个，否则返回空）
+const VALID_PLACEMENTS = ['scorer', 'play', 'home'];
+function normalizePlacements(raw) {
+  let arr = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+  const chosen = arr.filter(function (p) { return VALID_PLACEMENTS.indexOf(p) >= 0; });
+  return chosen.join(',');   // 空字符串表示未选任何有效位置
+}
+
 // ── 公开 API (CORS) ───────────────────────────────────────
 
 router.use('/api', (req, res, next) => {
@@ -304,6 +312,9 @@ router.post('/ads/add', requireSbAuth, async (req, res) => {
   const u = req.session.sbUser;
   const { title, content_type, content_text, content_url, link_url, region_id, start_time, end_time, frequency_minutes } = req.body;
   if (!title) { req.flash('error', '请填写广告标题'); return res.redirect('/scoreboard/ads'); }
+  // 发布位置（至少选一个）：scorer=计分器 / play=网上赛事 / home=官网首页
+  const placements = normalizePlacements(req.body.placements);
+  if (!placements) { req.flash('error', '请至少选择一个发布位置'); return res.redirect('/scoreboard/ads'); }
   // 区域用户只能为自己的区域创建广告
   if (u.role !== 'admin' && region_id) {
     const allowed = await queryOne('SELECT 1 FROM sb_user_regions WHERE user_id=$1 AND region_id=$2', [u.id, region_id]);
@@ -311,9 +322,9 @@ router.post('/ads/add', requireSbAuth, async (req, res) => {
   }
   const freqMin = frequency_minutes && parseInt(frequency_minutes) > 0 ? parseInt(frequency_minutes) : null;
   await query(
-    'INSERT INTO sb_ads (title, content_type, content_text, content_url, link_url, region_id, start_time, end_time, frequency_minutes, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+    'INSERT INTO sb_ads (title, content_type, content_text, content_url, link_url, region_id, start_time, end_time, frequency_minutes, placements, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
     [title, content_type || 'text', content_text || '', content_url || '', link_url || '',
-     region_id || null, start_time || null, end_time || null, freqMin, u.id]
+     region_id || null, start_time || null, end_time || null, freqMin, placements, u.id]
   );
   req.flash('success', '广告已创建');
   res.redirect('/scoreboard/ads');
@@ -330,13 +341,15 @@ router.post('/ads/:id/edit', requireSbAuth, async (req, res) => {
       req.flash('error', '无权操作该广告'); return res.redirect('/scoreboard/ads');
     }
   }
+  const placements = normalizePlacements(req.body.placements);
+  if (!placements) { req.flash('error', '请至少选择一个发布位置'); return res.redirect('/scoreboard/ads'); }
   const freqMin = frequency_minutes && parseInt(frequency_minutes) > 0 ? parseInt(frequency_minutes) : null;
   await query(
     `UPDATE sb_ads SET title=$1, content_type=$2, content_text=$3, content_url=$4,
      link_url=$5, region_id=$6, start_time=$7, end_time=$8, frequency_minutes=$9,
-     is_active=1 WHERE id=$10`,
+     placements=$10, is_active=1 WHERE id=$11`,
     [title, content_type || 'text', content_text || '', content_url || '', link_url || '',
-     region_id || null, start_time || null, end_time || null, freqMin, req.params.id]
+     region_id || null, start_time || null, end_time || null, freqMin, placements, req.params.id]
   );
   req.flash('success', '广告已更新并重新发布');
   res.redirect('/scoreboard/ads');
