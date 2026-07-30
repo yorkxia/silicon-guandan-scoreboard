@@ -56,7 +56,7 @@
     <!-- Add Ad Form -->
     <div class="a-card" style="margin-bottom:24px">
       <h3 style="margin:0 0 16px; color:#D4AC0D">➕ 新增广告</h3>
-      <form action="/scoreboard/ads/add" method="POST">
+      <form action="/scoreboard/ads/add" method="POST" enctype="multipart/form-data">
         <div style="display:grid; grid-template-columns:2fr 1fr; gap:12px; margin-bottom:12px">
           <div class="a-form-group" style="margin:0">
             <label>广告标题 *</label>
@@ -87,8 +87,10 @@
             <textarea name="content_text" class="a-input" rows="3" placeholder="广告文字内容..."></textarea>
           </div>
           <div class="a-form-group" style="margin:0; display:none" id="fieldUrl">
-            <label>图片/视频 URL</label>
-            <input type="url" name="content_url" class="a-input" placeholder="图片直链，或视频：YouTube/Vimeo链接或 .mp4 直链">
+            <label>图片/视频（上传本地文件 或 粘贴链接，二选一）</label>
+            <input type="file" name="media_file" accept="image/*,video/*" class="a-input" style="padding:7px">
+            <input type="text" name="content_url" class="a-input" style="margin-top:6px" placeholder="或粘贴链接：图片直链 / YouTube / Vimeo / .mp4">
+            <div style="font-size:0.72rem; color:#666; margin-top:3px">上传：图片≤5MB、视频≤20MB；YouTube/Vimeo 只能用链接。填了上传文件则以文件为准。</div>
           </div>
         </div>
         <div class="a-form-group" style="margin:0 0 14px">
@@ -222,7 +224,7 @@
       <h3>✏️ 编辑广告 · Edit Ad <span id="editAdId" style="color:#888; font-size:0.85rem"></span></h3>
       <button class="modal-close" onclick="closeEdit()">✕</button>
     </div>
-    <form id="editForm" method="POST">
+    <form id="editForm" method="POST" enctype="multipart/form-data">
       <div style="display:grid; grid-template-columns:2fr 1fr; gap:12px; margin-bottom:12px">
         <div class="a-form-group" style="margin:0">
           <label>广告标题 *</label>
@@ -253,8 +255,10 @@
           <textarea name="content_text" id="e_content_text" class="a-input" rows="3"></textarea>
         </div>
         <div class="a-form-group" style="margin:0" id="e_fieldUrl">
-          <label>图片/视频 URL</label>
-          <input type="url" name="content_url" id="e_content_url" class="a-input" placeholder="图片直链，或视频：YouTube/Vimeo链接或 .mp4 直链">
+          <label>图片/视频（上传新文件 或 粘贴链接）</label>
+          <input type="file" name="media_file" accept="image/*,video/*" class="a-input" style="padding:7px">
+          <input type="text" name="content_url" id="e_content_url" class="a-input" style="margin-top:6px" placeholder="图片直链 / YouTube / Vimeo / .mp4，或上传的 /ad-media/…">
+          <div style="font-size:0.72rem; color:#666; margin-top:3px">上传新文件将替换原有媒体（图片≤5MB、视频≤20MB）。</div>
         </div>
       </div>
       <div class="a-form-group" style="margin:0 0 14px">

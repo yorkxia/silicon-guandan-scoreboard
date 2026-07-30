@@ -4,6 +4,34 @@ const bcrypt = require('bcryptjs');
 const { query, queryOne } = require('../db/init');
 const { requireSbAuth, requireSbAdmin } = require('../middleware/sbAuth');
 const { ipHash, geoLocate } = require('../utils/geo');
+const multer = require('multer');
+
+// 广告图片/视频上传：存内存 → 写入共享库 sb_ad_media（硬上限25MB；分类型上限在处理器里再校验）
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+function adUpload(req, res, next) {
+  upload.single('media_file')(req, res, function (err) {
+    if (err) {
+      const msg = err.code === 'LIMIT_FILE_SIZE' ? '文件过大（硬上限 25MB）' : ('文件上传失败：' + err.message);
+      req.flash('error', msg);
+      return res.redirect('/scoreboard/ads');
+    }
+    next();
+  });
+}
+// 处理上传文件：校验类型/大小 → 存库 → 返回 /ad-media/<id>；无文件返回 null
+async function saveUploadedMedia(file, flash) {
+  if (!file) return null;
+  const isImage = /^image\//.test(file.mimetype);
+  const isVideo = /^video\//.test(file.mimetype);
+  if (!isImage && !isVideo) { flash('只能上传图片或视频文件'); return false; }
+  const maxBytes = isVideo ? 20 * 1024 * 1024 : 5 * 1024 * 1024;
+  if (file.size > maxBytes) { flash(isVideo ? '视频请≤20MB（更大请用链接/YouTube）' : '图片请≤5MB'); return false; }
+  const row = await queryOne(
+    'INSERT INTO sb_ad_media (mime, data, size_bytes) VALUES ($1,$2,$3) RETURNING id',
+    [file.mimetype, file.buffer, file.size]
+  );
+  return '/ad-media/' + row.id;
+}
 
 // 发布位置：scorer=计分器 / play=网上赛事 / home=官网首页。规整表单勾选为逗号分隔字符串（至少一个，否则返回空）
 const VALID_PLACEMENTS = ['scorer', 'play', 'home'];
@@ -320,7 +348,7 @@ router.get('/ads', requireSbAuth, async (req, res) => {
   res.render('scoreboard/ads', { sbUser: u, ads, regions, error: req.flash('error'), success: req.flash('success') });
 });
 
-router.post('/ads/add', requireSbAuth, async (req, res) => {
+router.post('/ads/add', requireSbAuth, adUpload, async (req, res) => {
   const u = req.session.sbUser;
   const { title, content_type, content_text, content_url, link_url, start_time, end_time, frequency_minutes } = req.body;
   if (!title) { req.flash('error', '请填写广告标题'); return res.redirect('/scoreboard/ads'); }
@@ -337,17 +365,22 @@ router.post('/ads/add', requireSbAuth, async (req, res) => {
       if (!allowed) { req.flash('error', '无权操作所选区域'); return res.redirect('/scoreboard/ads'); }
     }
   }
+  // 媒体：优先用上传的本地文件（存共享库），否则用粘贴的链接
+  let contentUrl = content_url || '';
+  const uploaded = await saveUploadedMedia(req.file, function (m) { req.flash('error', m); });
+  if (uploaded === false) return res.redirect('/scoreboard/ads');   // 上传校验失败
+  if (uploaded) contentUrl = uploaded;
   const freqMin = frequency_minutes && parseInt(frequency_minutes) > 0 ? parseInt(frequency_minutes) : null;
   await query(
     'INSERT INTO sb_ads (title, content_type, content_text, content_url, link_url, region_id, region_ids, start_time, end_time, frequency_minutes, placements, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
-    [title, content_type || 'text', content_text || '', content_url || '', link_url || '',
+    [title, content_type || 'text', content_text || '', contentUrl, link_url || '',
      firstRegionId, regionIds || null, start_time || null, end_time || null, freqMin, placements, u.id]
   );
   req.flash('success', '广告已创建');
   res.redirect('/scoreboard/ads');
 });
 
-router.post('/ads/:id/edit', requireSbAuth, async (req, res) => {
+router.post('/ads/:id/edit', requireSbAuth, adUpload, async (req, res) => {
   const u = req.session.sbUser;
   const { title, content_type, content_text, content_url, link_url, start_time, end_time, frequency_minutes } = req.body;
   if (!title) { req.flash('error', '请填写广告标题'); return res.redirect('/scoreboard/ads'); }
@@ -368,12 +401,17 @@ router.post('/ads/:id/edit', requireSbAuth, async (req, res) => {
       if (!allowed) { req.flash('error', '无权操作所选区域'); return res.redirect('/scoreboard/ads'); }
     }
   }
+  // 媒体：上传了新文件就替换，否则保留原 content_url（表单会回填，可为 /ad-media/x 或外链）
+  let contentUrl = content_url || '';
+  const uploaded = await saveUploadedMedia(req.file, function (m) { req.flash('error', m); });
+  if (uploaded === false) return res.redirect('/scoreboard/ads');
+  if (uploaded) contentUrl = uploaded;
   const freqMin = frequency_minutes && parseInt(frequency_minutes) > 0 ? parseInt(frequency_minutes) : null;
   await query(
     `UPDATE sb_ads SET title=$1, content_type=$2, content_text=$3, content_url=$4,
      link_url=$5, region_id=$6, region_ids=$7, start_time=$8, end_time=$9, frequency_minutes=$10,
      placements=$11, is_active=1 WHERE id=$12`,
-    [title, content_type || 'text', content_text || '', content_url || '', link_url || '',
+    [title, content_type || 'text', content_text || '', contentUrl, link_url || '',
      firstRegionId, regionIds || null, start_time || null, end_time || null, freqMin, placements, req.params.id]
   );
   req.flash('success', '广告已更新并重新发布');
