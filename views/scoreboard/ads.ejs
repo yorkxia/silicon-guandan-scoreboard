@@ -57,7 +57,7 @@
     <div class="a-card" style="margin-bottom:24px">
       <h3 style="margin:0 0 16px; color:#D4AC0D">➕ 新增广告</h3>
       <form action="/scoreboard/ads/add" method="POST">
-        <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:12px; margin-bottom:12px">
+        <div style="display:grid; grid-template-columns:2fr 1fr; gap:12px; margin-bottom:12px">
           <div class="a-form-group" style="margin:0">
             <label>广告标题 *</label>
             <input type="text" name="title" class="a-input" placeholder="广告标题" required>
@@ -71,14 +71,14 @@
               <option value="banner">横幅</option>
             </select>
           </div>
-          <div class="a-form-group" style="margin:0">
-            <label>目标区域</label>
-            <select name="region_id" class="a-input">
-              <option value="">全球通用 (GLOBAL)</option>
-              <% regions.forEach(function(r) { %>
-                <option value="<%= r.id %>"><%= r.area_code %> · <%= r.area_name_zh %></option>
-              <% }) %>
-            </select>
+        </div>
+        <div class="a-form-group" style="margin:0 0 12px">
+          <label>目标区域（可单选或多选；勾"全球通用"或都不勾=所有地区）</label>
+          <div style="display:flex; flex-wrap:wrap; gap:14px; margin-top:5px">
+            <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer"><input type="checkbox" class="a-region-global" onchange="onGlobalToggle(this,'add')" checked> 🌏 全球通用（所有地区）</label>
+            <% regions.forEach(function(r) { %>
+              <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer"><input type="checkbox" class="a-region" name="region_ids" value="<%= r.id %>" onchange="onRegionToggle('add')"> <%= r.area_code %> · <%= r.area_name_zh %></label>
+            <% }) %>
           </div>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px">
@@ -141,7 +141,13 @@
                 <% } %>
               </td>
               <td><span style="font-size:0.78rem; color:#aaa"><%= ad.content_type %></span></td>
-              <td><%= ad.area_name_zh || '<span style="color:#666">全球</span>' %></td>
+              <td style="font-size:0.76rem"><%
+                var _rids = (ad.region_ids || (ad.region_id ? String(ad.region_id) : '')).split(',').filter(Boolean);
+                if (_rids.length === 0) { %><span style="color:#666">全球</span><% }
+                else {
+                  var _rmap = {}; regions.forEach(function(rr){ _rmap[String(rr.id)] = rr.area_name_zh; });
+                %><%= _rids.map(function(id){ return _rmap[id] || ('#'+id); }).join('、') %><% }
+              %></td>
               <td style="font-size:0.72rem; color:#bbb"><%
                 var _pl = (ad.placements || '').split(',').filter(Boolean);
                 var _PN = { scorer:'计分器', play:'网上赛事', home:'首页' };
@@ -181,6 +187,7 @@
                     content_url: <%= JSON.stringify(ad.content_url || '') %>,
                     link_url: <%= JSON.stringify(ad.link_url || '') %>,
                     region_id: '<%= ad.region_id || "" %>',
+                    region_ids: <%= JSON.stringify(ad.region_ids || '') %>,
                     start_time: '<%= ad.start_time ? new Date(ad.start_time).toISOString().slice(0,19).replace("T"," ") : "" %>',
                     end_time: '<%= ad.end_time ? new Date(ad.end_time).toISOString().slice(0,19).replace("T"," ") : "" %>',
                     frequency_minutes: '<%= ad.frequency_minutes || "" %>',
@@ -216,7 +223,7 @@
       <button class="modal-close" onclick="closeEdit()">✕</button>
     </div>
     <form id="editForm" method="POST">
-      <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:12px; margin-bottom:12px">
+      <div style="display:grid; grid-template-columns:2fr 1fr; gap:12px; margin-bottom:12px">
         <div class="a-form-group" style="margin:0">
           <label>广告标题 *</label>
           <input type="text" name="title" id="e_title" class="a-input" required>
@@ -230,14 +237,14 @@
             <option value="banner">横幅</option>
           </select>
         </div>
-        <div class="a-form-group" style="margin:0">
-          <label>目标区域</label>
-          <select name="region_id" id="e_region_id" class="a-input">
-            <option value="">全球通用 (GLOBAL)</option>
-            <% regions.forEach(function(r) { %>
-              <option value="<%= r.id %>"><%= r.area_code %> · <%= r.area_name_zh %></option>
-            <% }) %>
-          </select>
+      </div>
+      <div class="a-form-group" style="margin:0 0 12px">
+        <label>目标区域（可单选或多选；勾"全球通用"或都不勾=所有地区）</label>
+        <div style="display:flex; flex-wrap:wrap; gap:14px; margin-top:5px">
+          <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer"><input type="checkbox" class="e-region-global" onchange="onGlobalToggle(this,'edit')"> 🌏 全球通用（所有地区）</label>
+          <% regions.forEach(function(r) { %>
+            <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer"><input type="checkbox" class="e-region" name="region_ids" value="<%= r.id %>" onchange="onRegionToggle('edit')"> <%= r.area_code %> · <%= r.area_name_zh %></label>
+          <% }) %>
         </div>
       </div>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px">
@@ -298,6 +305,18 @@ function toggleAdFields(type, urlFieldId) {
   if (el) el.style.display = (type === 'image' || type === 'banner' || type === 'video') ? '' : 'none';
 }
 
+// 目标区域 全球/具体地区 互斥联动
+function onGlobalToggle(cb, scope) {
+  var rc = scope === 'edit' ? '.e-region' : '.a-region';
+  if (cb.checked) document.querySelectorAll(rc).forEach(function(x){ x.checked = false; });
+}
+function onRegionToggle(scope) {
+  var rc = scope === 'edit' ? '.e-region' : '.a-region';
+  var gc = scope === 'edit' ? '.e-region-global' : '.a-region-global';
+  var any = Array.prototype.some.call(document.querySelectorAll(rc), function(x){ return x.checked; });
+  var g = document.querySelector(gc); if (g) g.checked = !any;
+}
+
 function openEdit(ad) {
   document.getElementById('editAdId').textContent = '(ID: ' + ad.id + ')';
   document.getElementById('editForm').action = '/scoreboard/ads/' + ad.id + '/edit';
@@ -313,8 +332,11 @@ function openEdit(ad) {
   ct.value = ad.content_type;
   toggleAdFields(ad.content_type, 'e_fieldUrl');
 
-  // 区域
-  document.getElementById('e_region_id').value = ad.region_id;
+  // 目标区域：按 region_ids 勾选（空=全球，兼容老广告的单 region_id）
+  var rids = (ad.region_ids || (ad.region_id ? String(ad.region_id) : '')).split(',').filter(Boolean);
+  var isGlobalR = rids.length === 0;
+  var gcb = document.querySelector('.e-region-global'); if (gcb) gcb.checked = isGlobalR;
+  document.querySelectorAll('.e-region').forEach(function(cb){ cb.checked = rids.indexOf(cb.value) >= 0; });
 
   // 发布位置：空=全部位置(老广告)→全勾；否则按存储勾选
   var places = (ad.placements || '').split(',').filter(Boolean);

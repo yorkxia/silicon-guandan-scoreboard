@@ -13,6 +13,17 @@ function normalizePlacements(raw) {
   return chosen.join(',');   // 空字符串表示未选任何有效位置
 }
 
+// 目标区域（可多选）：只保留纯数字 id，去重；空字符串=全球。'global' 哨兵会被过滤掉
+function normalizeRegionIds(raw) {
+  let arr = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+  const ids = [];
+  arr.forEach(function (v) {
+    v = String(v).trim();
+    if (/^\d+$/.test(v) && ids.indexOf(v) < 0) ids.push(v);
+  });
+  return ids.join(',');   // 空字符串表示全球（所有地区）
+}
+
 // ── 公开 API (CORS) ───────────────────────────────────────
 
 router.use('/api', (req, res, next) => {
@@ -38,9 +49,10 @@ router.get('/api/ads', async (req, res) => {
         AND (a.start_time IS NULL OR a.start_time <= $1)
         AND (a.end_time IS NULL OR a.end_time >= $1)
         AND (
-          a.region_id IS NULL
-          OR r.area_code = 'GLOBAL'
-          OR r.area_code = $2
+          a.region_ids IS NULL OR a.region_ids = ''
+          OR EXISTS (SELECT 1 FROM sb_regions rr
+                     WHERE rr.id = ANY(string_to_array(a.region_ids, ',')::int[])
+                       AND (rr.area_code = 'GLOBAL' OR rr.area_code = $2))
         )
       ORDER BY
         CASE WHEN r.area_code = $2 THEN 0 ELSE 1 END,
@@ -310,21 +322,26 @@ router.get('/ads', requireSbAuth, async (req, res) => {
 
 router.post('/ads/add', requireSbAuth, async (req, res) => {
   const u = req.session.sbUser;
-  const { title, content_type, content_text, content_url, link_url, region_id, start_time, end_time, frequency_minutes } = req.body;
+  const { title, content_type, content_text, content_url, link_url, start_time, end_time, frequency_minutes } = req.body;
   if (!title) { req.flash('error', '请填写广告标题'); return res.redirect('/scoreboard/ads'); }
   // 发布位置（至少选一个）：scorer=计分器 / play=网上赛事 / home=官网首页
   const placements = normalizePlacements(req.body.placements);
   if (!placements) { req.flash('error', '请至少选择一个发布位置'); return res.redirect('/scoreboard/ads'); }
-  // 区域用户只能为自己的区域创建广告
-  if (u.role !== 'admin' && region_id) {
-    const allowed = await queryOne('SELECT 1 FROM sb_user_regions WHERE user_id=$1 AND region_id=$2', [u.id, region_id]);
-    if (!allowed) { req.flash('error', '无权操作该区域'); return res.redirect('/scoreboard/ads'); }
+  // 目标区域（可多选；空=全球）；region_id 存首个所选，兼容统计/权限
+  const regionIds = normalizeRegionIds(req.body.region_ids);
+  const firstRegionId = regionIds ? parseInt(regionIds.split(',')[0]) : null;
+  // 区域用户只能为自己的区域创建广告：所选每个区域都必须被授权
+  if (u.role !== 'admin' && regionIds) {
+    for (const rid of regionIds.split(',')) {
+      const allowed = await queryOne('SELECT 1 FROM sb_user_regions WHERE user_id=$1 AND region_id=$2', [u.id, rid]);
+      if (!allowed) { req.flash('error', '无权操作所选区域'); return res.redirect('/scoreboard/ads'); }
+    }
   }
   const freqMin = frequency_minutes && parseInt(frequency_minutes) > 0 ? parseInt(frequency_minutes) : null;
   await query(
-    'INSERT INTO sb_ads (title, content_type, content_text, content_url, link_url, region_id, start_time, end_time, frequency_minutes, placements, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
+    'INSERT INTO sb_ads (title, content_type, content_text, content_url, link_url, region_id, region_ids, start_time, end_time, frequency_minutes, placements, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
     [title, content_type || 'text', content_text || '', content_url || '', link_url || '',
-     region_id || null, start_time || null, end_time || null, freqMin, placements, u.id]
+     firstRegionId, regionIds || null, start_time || null, end_time || null, freqMin, placements, u.id]
   );
   req.flash('success', '广告已创建');
   res.redirect('/scoreboard/ads');
@@ -332,7 +349,7 @@ router.post('/ads/add', requireSbAuth, async (req, res) => {
 
 router.post('/ads/:id/edit', requireSbAuth, async (req, res) => {
   const u = req.session.sbUser;
-  const { title, content_type, content_text, content_url, link_url, region_id, start_time, end_time, frequency_minutes } = req.body;
+  const { title, content_type, content_text, content_url, link_url, start_time, end_time, frequency_minutes } = req.body;
   if (!title) { req.flash('error', '请填写广告标题'); return res.redirect('/scoreboard/ads'); }
   // 区域用户只能编辑自己区域的广告
   if (u.role !== 'admin') {
@@ -343,13 +360,21 @@ router.post('/ads/:id/edit', requireSbAuth, async (req, res) => {
   }
   const placements = normalizePlacements(req.body.placements);
   if (!placements) { req.flash('error', '请至少选择一个发布位置'); return res.redirect('/scoreboard/ads'); }
+  const regionIds = normalizeRegionIds(req.body.region_ids);
+  const firstRegionId = regionIds ? parseInt(regionIds.split(',')[0]) : null;
+  if (u.role !== 'admin' && regionIds) {
+    for (const rid of regionIds.split(',')) {
+      const allowed = await queryOne('SELECT 1 FROM sb_user_regions WHERE user_id=$1 AND region_id=$2', [u.id, rid]);
+      if (!allowed) { req.flash('error', '无权操作所选区域'); return res.redirect('/scoreboard/ads'); }
+    }
+  }
   const freqMin = frequency_minutes && parseInt(frequency_minutes) > 0 ? parseInt(frequency_minutes) : null;
   await query(
     `UPDATE sb_ads SET title=$1, content_type=$2, content_text=$3, content_url=$4,
-     link_url=$5, region_id=$6, start_time=$7, end_time=$8, frequency_minutes=$9,
-     placements=$10, is_active=1 WHERE id=$11`,
+     link_url=$5, region_id=$6, region_ids=$7, start_time=$8, end_time=$9, frequency_minutes=$10,
+     placements=$11, is_active=1 WHERE id=$12`,
     [title, content_type || 'text', content_text || '', content_url || '', link_url || '',
-     region_id || null, start_time || null, end_time || null, freqMin, placements, req.params.id]
+     firstRegionId, regionIds || null, start_time || null, end_time || null, freqMin, placements, req.params.id]
   );
   req.flash('success', '广告已更新并重新发布');
   res.redirect('/scoreboard/ads');

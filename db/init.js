@@ -234,6 +234,10 @@ async function initDB() {
   await query(`ALTER TABLE sb_ads ADD COLUMN IF NOT EXISTS frequency_minutes INTEGER DEFAULT NULL`);
   // 迁移：添加 placements 列（发布位置：scorer/play/home 逗号分隔；NULL/空=全部位置，兼容老广告）
   await query(`ALTER TABLE sb_ads ADD COLUMN IF NOT EXISTS placements TEXT DEFAULT NULL`);
+  // 迁移：添加 region_ids 列（目标区域可多选，逗号分隔 sb_regions.id；NULL/空=全球）
+  await query(`ALTER TABLE sb_ads ADD COLUMN IF NOT EXISTS region_ids TEXT DEFAULT NULL`);
+  // 回填：老广告单地区 region_id → region_ids（只填未设置过的，幂等）
+  await query(`UPDATE sb_ads SET region_ids = region_id::text WHERE region_ids IS NULL AND region_id IS NOT NULL`);
   // 迁移：添加 backup_partner_name_enc 列（如果不存在）
   await query(`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS backup_partner_name_enc TEXT`);
   // 迁移：添加 payment_type 列（如果不存在）
