@@ -67,6 +67,7 @@
             <select name="content_type" class="a-input" id="adContentType" onchange="toggleAdFields(this.value, 'fieldUrl')">
               <option value="text">文字</option>
               <option value="image">图片</option>
+              <option value="video">视频</option>
               <option value="banner">横幅</option>
             </select>
           </div>
@@ -86,8 +87,8 @@
             <textarea name="content_text" class="a-input" rows="3" placeholder="广告文字内容..."></textarea>
           </div>
           <div class="a-form-group" style="margin:0; display:none" id="fieldUrl">
-            <label>图片/媒体 URL</label>
-            <input type="url" name="content_url" class="a-input" placeholder="https://...">
+            <label>图片/视频 URL</label>
+            <input type="url" name="content_url" class="a-input" placeholder="图片直链，或视频：YouTube/Vimeo链接或 .mp4 直链">
           </div>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:12px; margin-bottom:16px">
@@ -212,6 +213,7 @@
           <select name="content_type" id="e_content_type" class="a-input" onchange="toggleAdFields(this.value, 'e_fieldUrl')">
             <option value="text">文字</option>
             <option value="image">图片</option>
+            <option value="video">视频</option>
             <option value="banner">横幅</option>
           </select>
         </div>
@@ -231,8 +233,8 @@
           <textarea name="content_text" id="e_content_text" class="a-input" rows="3"></textarea>
         </div>
         <div class="a-form-group" style="margin:0" id="e_fieldUrl">
-          <label>图片/媒体 URL</label>
-          <input type="url" name="content_url" id="e_content_url" class="a-input" placeholder="https://...">
+          <label>图片/视频 URL</label>
+          <input type="url" name="content_url" id="e_content_url" class="a-input" placeholder="图片直链，或视频：YouTube/Vimeo链接或 .mp4 直链">
         </div>
       </div>
       <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:12px; margin-bottom:20px">
@@ -272,7 +274,7 @@ var editFpEnd   = flatpickr('#e_end_time',   fpConfig);
 
 function toggleAdFields(type, urlFieldId) {
   var el = document.getElementById(urlFieldId);
-  if (el) el.style.display = (type === 'image' || type === 'banner') ? '' : 'none';
+  if (el) el.style.display = (type === 'image' || type === 'banner' || type === 'video') ? '' : 'none';
 }
 
 function openEdit(ad) {
