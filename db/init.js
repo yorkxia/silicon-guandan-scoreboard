@@ -323,6 +323,28 @@ async function initDB() {
     )
   `);
 
+  // 计分器全局设置(收费开关) + 在线客服消息（与计分器前端共用同库）
+  await query(`
+    CREATE TABLE IF NOT EXISTS gd_settings (
+      skey       TEXT PRIMARY KEY,
+      sval       TEXT,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS gd_support_messages (
+      id          SERIAL PRIMARY KEY,
+      device_id   TEXT NOT NULL,
+      user_name   TEXT DEFAULT '',
+      sender      TEXT NOT NULL,
+      body        TEXT NOT NULL,
+      read_by_admin SMALLINT DEFAULT 0,
+      read_by_user  SMALLINT DEFAULT 0,
+      created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS idx_gd_support_device_time ON gd_support_messages(device_id, created_at)`);
+
   console.log('✅ Database initialized');
 }
 

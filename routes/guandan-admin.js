@@ -238,4 +238,96 @@ router.get('/activations/:id/qr', async (req, res) => {
   }
 });
 
+// ══════════ 计分器收费 全局开关 ══════════
+// GET /billing — 当前开关状态
+router.get('/billing', async (req, res) => {
+  try {
+    const en = await queryOne("SELECT sval FROM gd_settings WHERE skey='scorer_billing_enabled'");
+    const si = await queryOne("SELECT sval FROM gd_settings WHERE skey='scorer_billing_since'");
+    res.json({ ok: true, enabled: (en && en.sval === '1') ? 1 : 0, since: si ? si.sval : null });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// POST /billing — 开始/停止收费（仅管理员）
+router.post('/billing', requireSbAdmin, async (req, res) => {
+  try {
+    const enable = (req.body && (req.body.enabled === '1' || req.body.enabled === 1 || req.body.enabled === true)) ? 1 : 0;
+    const prev = await queryOne("SELECT sval FROM gd_settings WHERE skey='scorer_billing_enabled'");
+    const wasEnabled = !!(prev && prev.sval === '1');
+    await query(
+      `INSERT INTO gd_settings (skey, sval, updated_at) VALUES ('scorer_billing_enabled', $1, NOW())
+       ON CONFLICT (skey) DO UPDATE SET sval = $1, updated_at = NOW()`,
+      [String(enable)]
+    );
+    // 仅在从"停"→"开"时刷新 2 周宽限起点；已在收费中不重置
+    if (enable && !wasEnabled) {
+      const nowIso = new Date().toISOString();
+      await query(
+        `INSERT INTO gd_settings (skey, sval, updated_at) VALUES ('scorer_billing_since', $1, NOW())
+         ON CONFLICT (skey) DO UPDATE SET sval = $1, updated_at = NOW()`,
+        [nowIso]
+      );
+    }
+    const si = await queryOne("SELECT sval FROM gd_settings WHERE skey='scorer_billing_since'");
+    res.json({ ok: true, enabled: enable, since: si ? si.sval : null });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// ══════════ 客服交流（用户 ↔ 管理员）══════════
+// GET /support/threads — 会话列表（按设备聚合，含未读数与最后一条）
+router.get('/support/threads', async (req, res) => {
+  try {
+    const threads = await query(`
+      SELECT m.device_id,
+             MAX(m.created_at) AS last_at,
+             MAX(m.user_name) FILTER (WHERE m.user_name <> '') AS user_name,
+             COUNT(*) FILTER (WHERE m.sender = 'user' AND m.read_by_admin = 0) AS unread,
+             (SELECT body FROM gd_support_messages x WHERE x.device_id = m.device_id ORDER BY x.id DESC LIMIT 1) AS last_body
+      FROM gd_support_messages m
+      GROUP BY m.device_id
+      ORDER BY last_at DESC
+      LIMIT 300
+    `);
+    res.json({ ok: true, threads });
+  } catch (e) {
+    res.json({ ok: false, error: e.message, threads: [] });
+  }
+});
+
+// GET /support/messages?device_id= — 某会话全部消息（并标记用户消息为管理员已读）
+router.get('/support/messages', async (req, res) => {
+  try {
+    const { device_id } = req.query;
+    if (!device_id) return res.json({ ok: false, messages: [] });
+    const messages = await query(
+      "SELECT id, sender, body, user_name, created_at FROM gd_support_messages WHERE device_id=$1 ORDER BY id ASC LIMIT 500",
+      [device_id]
+    );
+    query("UPDATE gd_support_messages SET read_by_admin=1 WHERE device_id=$1 AND sender='user' AND read_by_admin=0",
+      [device_id]).catch(function () {});
+    res.json({ ok: true, messages });
+  } catch (e) {
+    res.json({ ok: false, messages: [] });
+  }
+});
+
+// POST /support/reply — 管理员回复某会话
+router.post('/support/reply', async (req, res) => {
+  try {
+    const { device_id, body } = req.body || {};
+    if (!device_id || !body || !String(body).trim()) return res.json({ ok: false, error: 'missing' });
+    await query(
+      "INSERT INTO gd_support_messages (device_id, user_name, sender, body) VALUES ($1,'客服','admin',$2)",
+      [String(device_id).slice(0, 80), String(body).trim().slice(0, 1000)]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
 module.exports = router;
