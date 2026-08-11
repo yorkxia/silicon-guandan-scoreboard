@@ -315,6 +315,43 @@ router.get('/support/messages', async (req, res) => {
   }
 });
 
+// ── 手机版客服「安装码」：生成/读取 token → 二维码 URL ──
+async function ensureCsToken(regen) {
+  let row = regen ? null : await queryOne("SELECT sval FROM gd_settings WHERE skey='cs_mobile_token'");
+  if (row && row.sval) return row.sval;
+  const token = crypto.randomBytes(18).toString('hex');
+  await query(
+    `INSERT INTO gd_settings (skey, sval, updated_at) VALUES ('cs_mobile_token', $1, NOW())
+     ON CONFLICT (skey) DO UPDATE SET sval = $1, updated_at = NOW()`,
+    [token]
+  );
+  return token;
+}
+async function csCodePayload(req, token) {
+  const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0];
+  const url = proto + '://' + req.get('host') + '/scoreboard/cs/' + token;
+  const qr = await QRCode.toDataURL(url, { width: 300, margin: 1 });
+  return { ok: true, url, qr };
+}
+// GET /cs-code — 取当前安装码（不存在则生成）
+router.get('/cs-code', async (req, res) => {
+  try {
+    const token = await ensureCsToken(false);
+    res.json(await csCodePayload(req, token));
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+// POST /cs-code/regenerate — 重新生成（吊销旧码，仅管理员）
+router.post('/cs-code/regenerate', requireSbAdmin, async (req, res) => {
+  try {
+    const token = await ensureCsToken(true);
+    res.json(await csCodePayload(req, token));
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
 // POST /support/reply — 管理员回复某会话
 router.post('/support/reply', async (req, res) => {
   try {

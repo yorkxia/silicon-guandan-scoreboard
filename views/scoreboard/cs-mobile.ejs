@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <title>掼蛋客服</title>
+  <!-- iOS 添加到主屏后以独立 App 方式打开 -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="掼蛋客服">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0a7d38">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;}
+    html,body{margin:0;height:100%;font-family:-apple-system,"PingFang SC",sans-serif;background:#0e1116;color:#eee;}
+    body{display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden;}
+    .cs-top{display:flex;align-items:center;justify-content:space-between;gap:8px;
+      padding:calc(env(safe-area-inset-top,0) + 12px) 14px 12px;background:linear-gradient(135deg,#0f9e45,#0a7d38);
+      color:#fff;font-weight:800;font-size:1rem;flex-shrink:0;}
+    .cs-top .back{cursor:pointer;font-size:1.3rem;padding:0 6px;display:none;}
+    .cs-top .refresh{cursor:pointer;font-size:1.05rem;opacity:.9;padding:0 4px;}
+    .cs-body{flex:1;min-height:0;position:relative;}
+    /* 会话列表 */
+    #threads{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+    .th{padding:14px 16px;border-bottom:1px solid #1e242c;cursor:pointer;}
+    .th:active{background:#141a22;}
+    .th-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+    .th-name{font-weight:700;color:#fff;font-size:0.98rem;}
+    .th-badge{background:#e33;color:#fff;border-radius:11px;padding:1px 8px;font-size:0.74rem;font-weight:700;}
+    .th-last{color:#9aa4af;font-size:0.85rem;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .th-time{color:#5f6a76;font-size:0.72rem;margin-top:3px;}
+    .empty{padding:40px 20px;text-align:center;color:#77828f;}
+    /* 对话 */
+    #chat{position:absolute;inset:0;display:none;flex-direction:column;background:#0e1116;}
+    #chat.open{display:flex;}
+    #msgs{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px;display:flex;flex-direction:column;gap:9px;}
+    .m{max-width:80%;padding:9px 13px;border-radius:15px;font-size:0.95rem;line-height:1.42;white-space:pre-wrap;word-break:break-word;}
+    .m .who{display:block;font-size:0.68rem;opacity:.65;margin-bottom:2px;}
+    .m.user{align-self:flex-start;background:#20272f;color:#eee;border:1px solid #2b333c;border-bottom-left-radius:5px;}
+    .m.admin{align-self:flex-end;background:#0f9e45;color:#fff;border-bottom-right-radius:5px;}
+    .cs-input{display:flex;gap:8px;padding:10px 12px calc(env(safe-area-inset-bottom,0) + 10px);
+      border-top:1px solid #1e242c;background:#12161c;flex-shrink:0;}
+    .cs-input input{flex:1;min-width:0;background:#1b2027;border:1px solid #2b333c;color:#fff;
+      border-radius:22px;padding:11px 16px;font-size:1rem;outline:none;}
+    .cs-input button{border:none;border-radius:22px;padding:0 20px;background:#0f9e45;color:#fff;font-weight:800;font-size:0.95rem;}
+    .cs-input button:active{transform:scale(.96);}
+  </style>
+</head>
+<body>
+  <div class="cs-top">
+    <span class="back" id="csBack" onclick="csShowList()">‹</span>
+    <span id="csTitle">💬 掼蛋在线客服</span>
+    <span class="refresh" onclick="csRefresh()">⟳</span>
+  </div>
+  <div class="cs-body">
+    <div id="threads"><div class="empty">加载中…</div></div>
+    <div id="chat">
+      <div id="msgs"></div>
+      <div class="cs-input">
+        <input id="csReply" type="text" placeholder="回复用户…" maxlength="500" autocomplete="off">
+        <button onclick="csSend()">发送</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  var TK   = '<%= token %>';
+  var BASE = '/scoreboard/cs/' + TK;
+  var curDevice = null, listTimer = null, msgTimer = null;
+
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function fmt(s){ try{ return new Date(s).toLocaleString('zh-CN'); }catch(e){ return s||''; } }
+  function el(id){ return document.getElementById(id); }
+
+  function loadThreads(){
+    fetch(BASE + '/threads').then(function(r){return r.json();}).then(function(d){
+      var box = el('threads');
+      if(!d.ok || !d.threads || !d.threads.length){ box.innerHTML = '<div class="empty">暂无用户咨询</div>'; return; }
+      var html = '';
+      d.threads.forEach(function(t){
+        var un = parseInt(t.unread)||0;
+        var nm = t.user_name || ('设备 ' + String(t.device_id).slice(0,8));
+        html += '<div class="th" onclick="csOpen(\''+esc(t.device_id)+'\')">'+
+          '<div class="th-top"><span class="th-name">'+esc(nm)+'</span>'+(un?'<span class="th-badge">'+un+'</span>':'')+'</div>'+
+          '<div class="th-last">'+esc(t.last_body||'')+'</div>'+
+          '<div class="th-time">'+fmt(t.last_at)+'</div></div>';
+      });
+      box.innerHTML = html;
+    }).catch(function(){});
+  }
+  function loadMsgs(silent){
+    if(!curDevice) return;
+    fetch(BASE + '/messages?device_id=' + encodeURIComponent(curDevice)).then(function(r){return r.json();}).then(function(d){
+      var box = el('msgs'); if(!box) return;
+      var atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 50;
+      box.innerHTML='';
+      (d.messages||[]).forEach(function(m){
+        var mine = m.sender==='admin';
+        var div = document.createElement('div');
+        div.className = 'm ' + (mine?'admin':'user');
+        div.innerHTML = '<span class="who">'+(mine?'客服(我)':esc(m.user_name||'用户'))+' · '+fmt(m.created_at)+'</span>'+esc(m.body);
+        box.appendChild(div);
+      });
+      if(!silent || atBottom) box.scrollTop = box.scrollHeight;
+    }).catch(function(){});
+  }
+  window.csOpen = function(dev){
+    curDevice = dev;
+    el('threads').style.display='none';
+    el('chat').classList.add('open');
+    el('csBack').style.display='inline';
+    loadMsgs();
+    if(msgTimer) clearInterval(msgTimer);
+    msgTimer = setInterval(function(){ loadMsgs(true); }, 4000);
+    setTimeout(function(){ try{ el('csReply').focus(); }catch(e){} }, 150);
+  };
+  window.csShowList = function(){
+    curDevice = null;
+    el('chat').classList.remove('open');
+    el('threads').style.display='block';
+    el('csBack').style.display='none';
+    if(msgTimer){ clearInterval(msgTimer); msgTimer=null; }
+    loadThreads();
+  };
+  window.csSend = function(){
+    var inp = el('csReply');
+    var body = (inp.value||'').trim();
+    if(!body || !curDevice) return;
+    inp.value='';
+    fetch(BASE + '/reply', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ device_id: curDevice, body: body }) })
+      .then(function(r){return r.json();}).then(function(d){ if(d.ok) loadMsgs(); })
+      .catch(function(){});
+  };
+  window.csRefresh = function(){ if(curDevice) loadMsgs(); else loadThreads(); };
+
+  el('csReply').addEventListener('keydown', function(e){ if(e.key==='Enter') csSend(); });
+  loadThreads();
+  listTimer = setInterval(function(){ if(!curDevice) loadThreads(); }, 8000);   // 列表 8s 刷新
+</script>
+</body>
+</html>

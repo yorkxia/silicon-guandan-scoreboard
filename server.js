@@ -9,6 +9,7 @@ const scoreboardRoutes = require('./routes/scoreboard');
 const intelligenceRoutes = require('./routes/intelligence');
 const guandanAdminRoutes = require('./routes/guandan-admin');
 const gdoConsoleRoutes = require('./routes/gdoConsole');
+const csRoutes = require('./routes/cs');
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use('/scoreboard/cs', csRoutes);   // 手机版在线客服（token 免登录，须在 /scoreboard 之前挂载）
 app.use('/scoreboard', scoreboardRoutes);
 app.use('/scoreboard/intelligence', intelligenceRoutes);
 app.use('/scoreboard/guandan-admin', guandanAdminRoutes);
