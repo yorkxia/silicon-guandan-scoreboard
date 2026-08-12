@@ -44,6 +44,14 @@
       border-radius:22px;padding:11px 16px;font-size:1rem;outline:none;}
     .cs-input button{border:none;border-radius:22px;padding:0 20px;background:#0f9e45;color:#fff;font-weight:800;font-size:0.95rem;}
     .cs-input button:active{transform:scale(.96);}
+    /* 顶部四个功能Tab */
+    .cs-tabs{display:flex;gap:6px;padding:8px 10px;background:#12161c;border-bottom:1px solid #1e242c;flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .cs-tab{flex:1 0 auto;white-space:nowrap;text-align:center;padding:8px 12px;border-radius:18px;font-size:0.82rem;font-weight:700;
+      color:#9aa4af;background:#1b2027;border:1px solid #2b333c;cursor:pointer;user-select:none;}
+    .cs-tab.active{color:#fff;background:linear-gradient(135deg,#0f9e45,#0a7d38);border-color:#0f9e45;}
+    .cs-tab:active{transform:scale(.97);}
+    .th-loc{color:#7f8b98;font-size:0.74rem;margin-top:3px;}
+    .m .who .loc{opacity:.85;}
   </style>
 </head>
 <body>
@@ -51,6 +59,12 @@
     <span class="back" id="csBack" onclick="csShowList()">‹</span>
     <span id="csTitle">💬 掼蛋在线客服</span>
     <span class="refresh" onclick="csRefresh()">⟳</span>
+  </div>
+  <div class="cs-tabs" id="csTabs">
+    <div class="cs-tab active" data-src="scorer"       onclick="csTab(this)">掼蛋计分器</div>
+    <div class="cs-tab"        data-src="online"       onclick="csTab(this)">网上赛事</div>
+    <div class="cs-tab"        data-src="tournament"   onclick="csTab(this)">掼蛋赛事管理</div>
+    <div class="cs-tab"        data-src="signup"       onclick="csTab(this)">网上掼蛋报名</div>
   </div>
   <div class="cs-body">
     <div id="threads"><div class="empty">加载中…</div></div>
@@ -66,23 +80,39 @@
 <script>
   var TK   = '<%= token %>';
   var BASE = '/scoreboard/cs/' + TK;
-  var curDevice = null, listTimer = null, msgTimer = null;
+  var curDevice = null, listTimer = null, msgTimer = null, curSource = 'scorer';
 
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function fmt(s){ try{ return new Date(s).toLocaleString('zh-CN'); }catch(e){ return s||''; } }
   function el(id){ return document.getElementById(id); }
+  // 拼装登录位置：城市, 地区/国家
+  function locStr(city, region){
+    var a = []; if(city) a.push(city); if(region) a.push(region);
+    return a.join(', ');
+  }
+
+  // 切换顶部功能Tab
+  window.csTab = function(node){
+    var tabs = document.querySelectorAll('.cs-tab');
+    for(var i=0;i<tabs.length;i++) tabs[i].classList.remove('active');
+    node.classList.add('active');
+    curSource = node.getAttribute('data-src') || 'scorer';
+    csShowList();   // 回到列表并按新来源刷新
+  };
 
   function loadThreads(){
-    fetch(BASE + '/threads').then(function(r){return r.json();}).then(function(d){
+    fetch(BASE + '/threads?source=' + encodeURIComponent(curSource)).then(function(r){return r.json();}).then(function(d){
       var box = el('threads');
       if(!d.ok || !d.threads || !d.threads.length){ box.innerHTML = '<div class="empty">暂无用户咨询</div>'; return; }
       var html = '';
       d.threads.forEach(function(t){
         var un = parseInt(t.unread)||0;
         var nm = t.user_name || ('设备 ' + String(t.device_id).slice(0,8));
+        var loc = locStr(t.user_city, t.user_region);
         html += '<div class="th" onclick="csOpen(\''+esc(t.device_id)+'\')">'+
           '<div class="th-top"><span class="th-name">'+esc(nm)+'</span>'+(un?'<span class="th-badge">'+un+'</span>':'')+'</div>'+
           '<div class="th-last">'+esc(t.last_body||'')+'</div>'+
+          (loc?'<div class="th-loc">📍 '+esc(loc)+'</div>':'')+
           '<div class="th-time">'+fmt(t.last_at)+'</div></div>';
       });
       box.innerHTML = html;
@@ -98,7 +128,14 @@
         var mine = m.sender==='admin';
         var div = document.createElement('div');
         div.className = 'm ' + (mine?'admin':'user');
-        div.innerHTML = '<span class="who">'+(mine?'客服(我)':esc(m.user_name||'用户'))+' · '+fmt(m.created_at)+'</span>'+esc(m.body);
+        var who;
+        if(mine){
+          who = '客服(我) · '+fmt(m.created_at);
+        }else{
+          var loc = locStr(m.user_city, m.user_region);
+          who = esc(m.user_name||'用户') + (loc?' · <span class="loc">📍'+esc(loc)+'</span>':'') + ' · '+fmt(m.created_at);
+        }
+        div.innerHTML = '<span class="who">'+who+'</span>'+esc(m.body);
         box.appendChild(div);
       });
       if(!silent || atBottom) box.scrollTop = box.scrollHeight;

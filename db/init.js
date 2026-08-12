@@ -344,6 +344,11 @@ async function initDB() {
     )
   `);
   await query(`CREATE INDEX IF NOT EXISTS idx_gd_support_device_time ON gd_support_messages(device_id, created_at)`);
+  // 客服系统扩展字段（幂等，与计分器系统仓库共用同一张表）
+  await query(`ALTER TABLE gd_support_messages ADD COLUMN IF NOT EXISTS source      TEXT DEFAULT 'scorer'`);
+  await query(`ALTER TABLE gd_support_messages ADD COLUMN IF NOT EXISTS user_city   TEXT DEFAULT ''`);
+  await query(`ALTER TABLE gd_support_messages ADD COLUMN IF NOT EXISTS user_region TEXT DEFAULT ''`);
+  await query(`ALTER TABLE gd_support_messages ADD COLUMN IF NOT EXISTS device_info TEXT DEFAULT ''`);
 
   console.log('✅ Database initialized');
 }

@@ -37,17 +37,22 @@ router.get('/:token', async (req, res) => {
 router.get('/:token/threads', async (req, res) => {
   try {
     if (!(await tokenOk(req.params.token))) return res.status(403).json({ ok: false, threads: [] });
+    // 按来源App过滤（掼蛋计分器=scorer；其他App暂无数据）
+    const source = String(req.query.source || 'scorer').slice(0, 32);
     const threads = await query(`
       SELECT m.device_id,
              MAX(m.created_at) AS last_at,
-             MAX(m.user_name) FILTER (WHERE m.user_name <> '') AS user_name,
+             MAX(m.user_name)   FILTER (WHERE m.user_name <> '')   AS user_name,
+             MAX(m.user_city)   FILTER (WHERE m.user_city <> '')   AS user_city,
+             MAX(m.user_region) FILTER (WHERE m.user_region <> '') AS user_region,
              COUNT(*) FILTER (WHERE m.sender = 'user' AND m.read_by_admin = 0) AS unread,
              (SELECT body FROM gd_support_messages x WHERE x.device_id = m.device_id ORDER BY x.id DESC LIMIT 1) AS last_body
       FROM gd_support_messages m
+      WHERE COALESCE(m.source,'scorer') = $1
       GROUP BY m.device_id
       ORDER BY last_at DESC
       LIMIT 300
-    `);
+    `, [source]);
     res.json({ ok: true, threads });
   } catch (e) {
     res.json({ ok: false, threads: [] });
@@ -61,7 +66,7 @@ router.get('/:token/messages', async (req, res) => {
     const { device_id } = req.query;
     if (!device_id) return res.json({ ok: false, messages: [] });
     const messages = await query(
-      "SELECT id, sender, body, user_name, created_at FROM gd_support_messages WHERE device_id=$1 ORDER BY id ASC LIMIT 500",
+      "SELECT id, sender, body, user_name, user_city, user_region, device_info, created_at FROM gd_support_messages WHERE device_id=$1 ORDER BY id ASC LIMIT 500",
       [device_id]
     );
     query("UPDATE gd_support_messages SET read_by_admin=1 WHERE device_id=$1 AND sender='user' AND read_by_admin=0",
