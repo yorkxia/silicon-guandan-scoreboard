@@ -172,6 +172,32 @@ router.get('/api', async (req, res) => {
   catch (e) { console.error('[控制台/实时]', e.message); res.status(500).json({ error: e.message }); }
 });
 
+// ── 是否进贡：4 个开关（4人/6人 × 随机/亲友）。默认 '1'=进贡；'0'=不进贡 ──
+const TRIBUTE_KEYS = ['gdo_tribute_4p_random', 'gdo_tribute_4p_private',
+                      'gdo_tribute_6p_random', 'gdo_tribute_6p_private'];
+router.get('/tribute', async (req, res) => {
+  try {
+    const rows = await query('SELECT skey, sval FROM gd_settings WHERE skey = ANY($1)', [TRIBUTE_KEYS]);
+    const map = {}; rows.forEach(r => { map[r.skey] = r.sval; });
+    const out = {};
+    TRIBUTE_KEYS.forEach(k => { out[k] = (map[k] === '0') ? '0' : '1'; });   // 缺省=进贡
+    res.json(out);
+  } catch (e) { console.error('[控制台/进贡读取]', e.message); res.status(500).json({ error: e.message }); }
+});
+router.post('/tribute', express.json(), async (req, res) => {
+  try {
+    const { key, value } = req.body || {};
+    if (TRIBUTE_KEYS.indexOf(key) < 0) return res.status(400).json({ error: 'bad key' });
+    const val = (value === '0') ? '0' : '1';
+    await query(
+      `INSERT INTO gd_settings (skey, sval, updated_at) VALUES ($1, $2, NOW())
+       ON CONFLICT (skey) DO UPDATE SET sval = EXCLUDED.sval, updated_at = NOW()`,
+      [key, val]
+    );
+    res.json({ ok: true, key, value: val });
+  } catch (e) { console.error('[控制台/进贡保存]', e.message); res.status(500).json({ error: e.message }); }
+});
+
 // 房间流水（四人 + 六人）
 router.get('/data/history', async (req, res) => {
   try {

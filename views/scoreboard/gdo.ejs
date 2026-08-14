@@ -117,6 +117,7 @@
       <div class="g-tab" data-pane="live">🟢 实时对局</div>
       <div class="g-tab" data-pane="players">👤 玩家档案</div>
       <div class="g-tab" data-pane="history">🗂️ 房间流水</div>
+      <div class="g-tab" data-pane="tribute">🎁 是否进贡</div>
       <div class="g-tab" data-pane="stats">📈 数据统计</div>
     </div>
 
@@ -180,6 +181,20 @@
         </div>
       </div>
       <p style="color:#666;font-size:0.76rem;margin-top:10px">💡 点击任意一行可展开该房逐局明细（大胜/小胜/末胜、升级结果）。列表最多显示最近 100 局房间。</p>
+    </section>
+
+    <!-- 是否进贡 -->
+    <section class="g-pane" id="pane-tribute">
+      <div class="a-card">
+        <h3 style="margin:0 0 6px; color:#D4AC0D">🎁 是否进贡</h3>
+        <p style="color:#888;font-size:0.8rem;margin:0 0 16px;line-height:1.6">
+          按赛事类型设置是否启用「进贡 / 还供」。
+          <b style="color:#27ae60">YES</b> = 保持现有进贡还供模式；
+          <b style="color:#e08e3c">NO</b> = 不进贡，改为「赛事首局玩家随机先出、之后每局头游先出」。
+          默认 <b>YES</b>。改动立即对之后开始的新一局生效（进行中的一局不受影响）。
+        </p>
+        <div id="tribute-rows"><div class="g-empty">加载中…</div></div>
+      </div>
     </section>
 
     <!-- 数据统计 -->
@@ -429,11 +444,54 @@
     }).catch(function(){});
   }
 
-  /* ── 标签页切换（房间流水/统计首次进入时懒加载） ── */
-  var loaded = { history:false, stats:false };
+  /* ── 是否进贡：4 个开关（4人/6人 × 随机/亲友）── */
+  var TRIBUTE_META = [
+    { key:'gdo_tribute_4p_random',  label:'个人随机参赛（4人）' },
+    { key:'gdo_tribute_4p_private', label:'亲友开房赛事（4人）' },
+    { key:'gdo_tribute_6p_random',  label:'个人随机参赛（6人）' },
+    { key:'gdo_tribute_6p_private', label:'亲友开房赛事（6人）' }
+  ];
+  function tribSeg(key, val, isYes){
+    var on    = isYes ? (val === '1') : (val === '0');
+    var color = isYes ? '#27ae60' : '#c0392b';
+    return '<button class="trib-seg" data-key="'+key+'" data-val="'+(isYes?'1':'0')+'" '
+      + 'style="border:none;cursor:pointer;padding:6px 15px;font-weight:800;font-size:0.8rem;transition:all .12s;'
+      + 'background:'+(on?color:'#2a2a2a')+';color:'+(on?'#fff':'#888')+';">'
+      + (isYes ? 'YES 进贡' : 'NO 不进贡') + '</button>';
+  }
+  function renderTribute(data){
+    var html = TRIBUTE_META.map(function(m){
+      var v = (data[m.key] === '0') ? '0' : '1';
+      return '<div style="display:flex;align-items:center;gap:14px;padding:11px 4px;border-bottom:1px solid #2a2a2a">'
+        + '<div style="flex:1;font-size:0.9rem;color:#eee">'+m.label+'</div>'
+        + '<div style="display:flex;border-radius:9px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.4)">'
+        + tribSeg(m.key, v, true) + tribSeg(m.key, v, false)
+        + '</div></div>';
+    }).join('');
+    document.getElementById('tribute-rows').innerHTML = html;
+    document.querySelectorAll('.trib-seg').forEach(function(b){
+      b.addEventListener('click', function(){ saveTribute(b.dataset.key, b.dataset.val); });
+    });
+  }
+  function loadTribute(){
+    fetch('/scoreboard/gdo/tribute', { headers:{ 'Accept':'application/json' } })
+      .then(function(r){ return r.json(); }).then(renderTribute)
+      .catch(function(){ document.getElementById('tribute-rows').innerHTML = '<div class="g-empty">加载失败</div>'; });
+  }
+  function saveTribute(key, value){
+    fetch('/scoreboard/gdo/tribute', { method:'POST', headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({ key:key, value:value }) })
+      .then(function(r){ return r.json(); })
+      .then(function(d){ if(d && d.ok) loadTribute(); })
+      .catch(function(){});
+  }
+
+  /* ── 标签页切换（房间流水/统计/是否进贡首次进入时懒加载） ── */
+  var loaded = { history:false, stats:false, tribute:false };
   function onSwitch(pane){
     if(pane === 'history' && !loaded.history){ loaded.history = true; loadHistory(); }
     if(pane === 'stats'   && !loaded.stats){   loaded.stats   = true; loadStats(); }
+    if(pane === 'tribute' && !loaded.tribute){ loaded.tribute = true; loadTribute(); }
   }
   document.querySelectorAll('.g-tab').forEach(function(t){
     t.addEventListener('click', function(){
