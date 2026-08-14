@@ -103,7 +103,7 @@
           <div style="overflow-y:auto; max-height:460px">
             <table class="a-table" style="font-size:0.78rem">
               <thead>
-                <tr><th>状态</th><th>来源</th><th>时间</th><th>国家</th><th>地区</th><th>城市</th></tr>
+                <tr><th>状态</th><th>昵称</th><th>来源</th><th>时间</th><th>国家</th><th>地区</th><th>城市</th></tr>
               </thead>
               <tbody>
                 <% recentVisits.forEach(function(v) { %>
@@ -120,6 +120,13 @@
                         <span style="display:inline-flex;align-items:center;font-size:0.72rem;color:#555">
                           <span class="online-dot offline"></span>离线
                         </span>
+                      <% } %>
+                    </td>
+                    <td>
+                      <% if (v.wx_name) { %>
+                        <span style="font-weight:700;color:#D4AC0D;white-space:nowrap"><%= v.wx_name %></span>
+                      <% } else { %>
+                        <span style="color:#555">-</span>
                       <% } %>
                     </td>
                     <td>

@@ -172,6 +172,8 @@ async function initDB() {
       visited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
+  // 计分器访问行的微信昵称（游戏端 wxlogin 回填；共享库，幂等）
+  await query(`ALTER TABLE sb_visits ADD COLUMN IF NOT EXISTS wx_name TEXT DEFAULT ''`);
   await query(`
     CREATE TABLE IF NOT EXISTS sb_user_regions (
       id SERIAL PRIMARY KEY,
