@@ -80,6 +80,15 @@ tr:hover td { background: rgba(255,255,255,0.03); }
 .filter-btn.active { background: #D4AC0D; color: #111; border-color: #D4AC0D; }
 .filter-btn:hover:not(.active) { color: #D4AC0D; border-color: #D4AC0D; }
 
+/* ── 客服交流：按产品分类的4个功能键 ── */
+.sup-src-btn {
+  padding: 7px 18px; border-radius: 20px; font-size: 0.82rem; font-weight: 700;
+  cursor: pointer; border: 1px solid #444; background: #1a1a2e; color: #888;
+  transition: all 0.15s;
+}
+.sup-src-btn.active { background: #D4AC0D; color: #111; border-color: #D4AC0D; }
+.sup-src-btn:hover:not(.active) { color: #D4AC0D; border-color: #D4AC0D; }
+
 /* ── Generate Form ── */
 .gd-gen-form {
   background: #1a1a2e; border: 1px solid #333; border-radius: 12px;
@@ -474,6 +483,14 @@ tr:hover td { background: rgba(255,255,255,0.03); }
         </div>
       </div>
 
+      <!-- 按产品分类的4个功能键（掼蛋计分器 / 网上赛事 / 掼蛋赛事管理 / 网上掼蛋报名）-->
+      <div id="sup-src-tabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+        <button class="sup-src-btn active" data-src="scorer"     onclick="supSrcTab(this)">掼蛋计分器</button>
+        <button class="sup-src-btn"        data-src="online"     onclick="supSrcTab(this)">网上赛事</button>
+        <button class="sup-src-btn"        data-src="tournament" onclick="supSrcTab(this)">掼蛋赛事管理</button>
+        <button class="sup-src-btn"        data-src="signup"     onclick="supSrcTab(this)">网上掼蛋报名</button>
+      </div>
+
       <div style="display:flex;gap:14px;flex-wrap:wrap;">
         <div id="support-threads" style="flex:0 0 280px;max-width:100%;background:#141414;border:1px solid #333;border-radius:12px;max-height:60vh;overflow-y:auto;">
           <div style="padding:16px;color:#888;">加载中…</div>
@@ -622,9 +639,20 @@ function regenCsCode(){
 }
 
 // ══════════ 客服交流 ══════════
-var supCurDevice = null, supPollTimer = null;
+var supCurDevice = null, supPollTimer = null, supSource = 'scorer';
+// 切换按产品分类的功能键：换来源、清空当前会话、重新拉列表
+function supSrcTab(node){
+  document.querySelectorAll('.sup-src-btn').forEach(function(b){ b.classList.remove('active'); });
+  node.classList.add('active');
+  supSource = node.getAttribute('data-src') || 'scorer';
+  supCurDevice = null;
+  if (supPollTimer) { clearInterval(supPollTimer); supPollTimer = null; }
+  var chat = document.getElementById('support-chat');
+  if (chat) chat.innerHTML = '<div style="padding:14px;color:#888;">← 点击左侧某个会话开始回复</div>';
+  loadSupportThreads();
+}
 function loadSupportThreads(){
-  fetch(BASE + '/support/threads').then(function(r){return r.json();}).then(function(d){
+  fetch(BASE + '/support/threads?source=' + encodeURIComponent(supSource)).then(function(r){return r.json();}).then(function(d){
     var box = document.getElementById('support-threads');
     if (!d.ok || !d.threads || !d.threads.length){ box.innerHTML = '<div style="padding:16px;color:#888;">暂无用户咨询</div>'; updateSupUnread(0); return; }
     var totalUnread = 0, html = '';

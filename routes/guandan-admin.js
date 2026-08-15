@@ -281,6 +281,8 @@ router.post('/billing', requireSbAdmin, async (req, res) => {
 // GET /support/threads — 会话列表（按设备聚合，含未读数与最后一条）
 router.get('/support/threads', async (req, res) => {
   try {
+    // 按来源App过滤（掼蛋计分器=scorer；网上赛事=online；赛事管理=tournament；报名=signup）
+    const source = String(req.query.source || 'scorer').slice(0, 32);
     const threads = await query(`
       SELECT m.device_id,
              MAX(m.created_at) AS last_at,
@@ -288,10 +290,11 @@ router.get('/support/threads', async (req, res) => {
              COUNT(*) FILTER (WHERE m.sender = 'user' AND m.read_by_admin = 0) AS unread,
              (SELECT body FROM gd_support_messages x WHERE x.device_id = m.device_id ORDER BY x.id DESC LIMIT 1) AS last_body
       FROM gd_support_messages m
+      WHERE COALESCE(m.source,'scorer') = $1
       GROUP BY m.device_id
       ORDER BY last_at DESC
       LIMIT 300
-    `);
+    `, [source]);
     res.json({ ok: true, threads });
   } catch (e) {
     res.json({ ok: false, error: e.message, threads: [] });
