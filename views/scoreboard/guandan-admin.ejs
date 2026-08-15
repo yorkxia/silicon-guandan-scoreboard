@@ -162,7 +162,6 @@ tr:hover td { background: rgba(255,255,255,0.03); }
       <button class="gd-tab" data-tab="payments" onclick="gdTab('payments')">💰 付款记录</button>
       <button class="gd-tab" data-tab="activations" onclick="gdTab('activations')">🔑 激活码管理</button>
       <button class="gd-tab" data-tab="billing" onclick="gdTab('billing')">💰 计分器收费</button>
-      <button class="gd-tab" data-tab="support" onclick="gdTab('support')">💬 客服交流 <span id="sup-unread-dot" style="display:none;background:#e33;color:#fff;border-radius:10px;padding:0 6px;font-size:0.72rem;margin-left:2px;"></span></button>
     </div>
 
     <!-- ── 仪表板 ── -->
@@ -462,45 +461,6 @@ tr:hover td { background: rgba(255,255,255,0.03); }
       </div>
     </div>
 
-    <!-- ── 客服交流 ── -->
-    <div class="gd-panel" id="panel-support">
-      <p class="section-title">💬 客服交流（来自计分器用户的咨询）</p>
-
-      <!-- 手机版客服 安装码 -->
-      <div id="cs-code-box" style="background:#141414;border:1px solid #333;border-radius:12px;padding:16px;margin-bottom:16px;display:flex;gap:18px;flex-wrap:wrap;align-items:center;">
-        <div style="text-align:center;">
-          <img id="cs-code-img" alt="客服安装码" style="width:150px;height:150px;background:#fff;border-radius:8px;display:block;">
-          <div style="color:#888;font-size:0.72rem;margin-top:6px;">📱 手机扫码安装</div>
-        </div>
-        <div style="flex:1;min-width:220px;color:#bbb;font-size:0.84rem;line-height:1.8;">
-          <div style="color:#4ad07a;font-weight:800;font-size:0.95rem;margin-bottom:6px;">📱 客服手机版 · 安装码</div>
-          用 <b style="color:#ddd;">苹果手机相机</b> 扫上方二维码 → 打开页面 → 点浏览器「分享 <span style="font-size:1.05em;">􀈂</span>」→「<b style="color:#ddd;">添加到主屏幕</b>」，即可像 App 一样随时打开，直接和计分器用户对话、解决问题。<br>
-          <div style="margin-top:8px;word-break:break-all;color:#7fa;font-size:0.78rem;" id="cs-code-url">…</div>
-          <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;">
-            <button class="btn" onclick="copyCsUrl()" style="background:#2a2a2a;color:#ddd;">📋 复制链接</button>
-            <button class="btn" onclick="regenCsCode()" style="background:#7a3030;color:#fff;">♻️ 重新生成（吊销旧码）</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 按产品分类的4个功能键（掼蛋计分器 / 网上赛事 / 掼蛋赛事管理 / 网上掼蛋报名）-->
-      <div id="sup-src-tabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
-        <button class="sup-src-btn active" data-src="scorer"     onclick="supSrcTab(this)">掼蛋计分器</button>
-        <button class="sup-src-btn"        data-src="online"     onclick="supSrcTab(this)">网上赛事</button>
-        <button class="sup-src-btn"        data-src="tournament" onclick="supSrcTab(this)">掼蛋赛事管理</button>
-        <button class="sup-src-btn"        data-src="signup"     onclick="supSrcTab(this)">网上掼蛋报名</button>
-      </div>
-
-      <div style="display:flex;gap:14px;flex-wrap:wrap;">
-        <div id="support-threads" style="flex:0 0 280px;max-width:100%;background:#141414;border:1px solid #333;border-radius:12px;max-height:60vh;overflow-y:auto;">
-          <div style="padding:16px;color:#888;">加载中…</div>
-        </div>
-        <div id="support-chat" style="flex:1;min-width:280px;background:#141414;border:1px solid #333;border-radius:12px;display:flex;flex-direction:column;max-height:60vh;">
-          <div style="padding:14px;color:#888;">← 点击左侧某个会话开始回复</div>
-        </div>
-      </div>
-    </div>
-
   </main>
 </div>
 
@@ -557,9 +517,8 @@ function gdTab(tab) {
   document.getElementById('panel-' + tab).classList.add('active');
   currentTab = tab;
 
-  // 计分器收费 / 客服交流：客户端 Tab，直接拉取 JSON，不做页面跳转
+  // 计分器收费：客户端 Tab，直接拉取 JSON，不做页面跳转
   if (tab === 'billing') { loadBilling(); return; }
-  if (tab === 'support') { loadCsCode(); loadSupportThreads(); return; }
 
   // Load data for tab via navigation
   if (tab === 'users') {
@@ -613,118 +572,6 @@ function setBilling(enable){
     if (d.ok) { renderBilling(d); alert(enable ? '✅ 已开始收费' : '✅ 已停止收费'); }
     else alert('操作失败：' + (d.error || '（可能无权限，仅管理员可设置）'));
   }).catch(function(){ alert('网络错误，请重试'); });
-}
-
-// ══════════ 手机版客服 安装码 ══════════
-var csCodeUrl = '';
-function renderCsCode(d){
-  if (!d || !d.ok) return;
-  csCodeUrl = d.url || '';
-  var img = document.getElementById('cs-code-img'); if (img) img.src = d.qr || '';
-  var u = document.getElementById('cs-code-url'); if (u) u.textContent = d.url || '';
-}
-function loadCsCode(){
-  fetch(BASE + '/cs-code').then(function(r){return r.json();}).then(renderCsCode).catch(function(){});
-}
-function copyCsUrl(){
-  if (!csCodeUrl) return;
-  navigator.clipboard && navigator.clipboard.writeText(csCodeUrl).then(function(){ alert('已复制客服手机版链接'); }, function(){ prompt('复制链接：', csCodeUrl); });
-}
-function regenCsCode(){
-  if (!confirm('重新生成后，旧的安装码/已装到手机的旧链接将立即失效，需要重新扫码安装。确定？')) return;
-  fetch(BASE + '/cs-code/regenerate', { method:'POST' }).then(function(r){return r.json();}).then(function(d){
-    if (d.ok){ renderCsCode(d); alert('✅ 已重新生成安装码'); }
-    else alert('操作失败：' + (d.error || '（仅管理员可重新生成）'));
-  }).catch(function(){ alert('网络错误'); });
-}
-
-// ══════════ 客服交流 ══════════
-var supCurDevice = null, supPollTimer = null, supSource = 'scorer';
-// 切换按产品分类的功能键：换来源、清空当前会话、重新拉列表
-function supSrcTab(node){
-  document.querySelectorAll('.sup-src-btn').forEach(function(b){ b.classList.remove('active'); });
-  node.classList.add('active');
-  supSource = node.getAttribute('data-src') || 'scorer';
-  supCurDevice = null;
-  if (supPollTimer) { clearInterval(supPollTimer); supPollTimer = null; }
-  var chat = document.getElementById('support-chat');
-  if (chat) chat.innerHTML = '<div style="padding:14px;color:#888;">← 点击左侧某个会话开始回复</div>';
-  loadSupportThreads();
-}
-function loadSupportThreads(){
-  fetch(BASE + '/support/threads?source=' + encodeURIComponent(supSource)).then(function(r){return r.json();}).then(function(d){
-    var box = document.getElementById('support-threads');
-    if (!d.ok || !d.threads || !d.threads.length){ box.innerHTML = '<div style="padding:16px;color:#888;">暂无用户咨询</div>'; updateSupUnread(0); return; }
-    var totalUnread = 0, html = '';
-    d.threads.forEach(function(t){
-      var un = parseInt(t.unread)||0; totalUnread += un;
-      var nm = t.user_name || ('设备 ' + String(t.device_id).slice(0,8));
-      html += '<div class="sup-thread" data-dev="'+esc(t.device_id)+'" onclick="openSupportThread(\''+esc(t.device_id)+'\')" '+
-        'style="padding:12px 14px;border-bottom:1px solid #262626;cursor:pointer;'+(t.device_id===supCurDevice?'background:#1e2a1e;':'')+'">'+
-        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'+
-          '<b style="color:#eee;font-size:0.9rem;">'+esc(nm)+'</b>'+
-          (un?'<span style="background:#e33;color:#fff;border-radius:10px;padding:0 7px;font-size:0.72rem;">'+un+'</span>':'')+
-        '</div>'+
-        '<div style="color:#999;font-size:0.78rem;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(t.last_body||'')+'</div>'+
-        '<div style="color:#666;font-size:0.7rem;margin-top:2px;">'+fmtTime(t.last_at)+'</div>'+
-      '</div>';
-    });
-    box.innerHTML = html;
-    updateSupUnread(totalUnread);
-  }).catch(function(){});
-}
-function updateSupUnread(n){
-  var dot = document.getElementById('sup-unread-dot');
-  if (!dot) return;
-  if (n>0){ dot.textContent = n; dot.style.display='inline-block'; } else { dot.style.display='none'; }
-}
-function openSupportThread(dev){
-  supCurDevice = dev;
-  loadSupportThreads();  // 刷新左侧高亮/未读
-  var chat = document.getElementById('support-chat');
-  chat.innerHTML =
-    '<div id="sup-msgs" style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px;"></div>'+
-    '<div style="display:flex;gap:8px;padding:10px;border-top:1px solid #2a2a2a;">'+
-      '<input id="sup-reply" placeholder="回复用户…" maxlength="500" style="flex:1;background:#111;border:1px solid #444;color:#eee;border-radius:8px;padding:9px 12px;outline:none;">'+
-      '<button class="btn btn-primary" onclick="sendSupportReply()">发送</button>'+
-    '</div>';
-  var inp = document.getElementById('sup-reply');
-  inp.addEventListener('keydown', function(e){ if(e.key==='Enter') sendSupportReply(); });
-  loadSupportMessages();
-  if (supPollTimer) clearInterval(supPollTimer);
-  supPollTimer = setInterval(function(){ if(currentTab==='support' && supCurDevice) loadSupportMessages(true); }, 5000);
-}
-function loadSupportMessages(silent){
-  if (!supCurDevice) return;
-  fetch(BASE + '/support/messages?device_id=' + encodeURIComponent(supCurDevice))
-    .then(function(r){return r.json();}).then(function(d){
-      var box = document.getElementById('sup-msgs');
-      if (!box) return;
-      var atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
-      box.innerHTML = '';
-      (d.messages||[]).forEach(function(m){
-        var mine = m.sender==='admin';
-        var div = document.createElement('div');
-        div.style.cssText = 'max-width:78%;padding:8px 12px;border-radius:12px;font-size:0.88rem;line-height:1.4;white-space:pre-wrap;word-break:break-word;'+
-          (mine ? 'align-self:flex-end;background:#1e9e4a;color:#fff;' : 'align-self:flex-start;background:#222;color:#eee;border:1px solid #333;');
-        div.innerHTML = '<span style="display:block;font-size:0.66rem;opacity:.7;margin-bottom:2px;">'+(mine?'客服(我)':esc(m.user_name||'用户'))+' · '+fmtTime(m.created_at)+'</span>'+esc(m.body);
-        box.appendChild(div);
-      });
-      if (!silent || atBottom) box.scrollTop = box.scrollHeight;
-    }).catch(function(){});
-}
-function sendSupportReply(){
-  var inp = document.getElementById('sup-reply');
-  var body = (inp.value||'').trim();
-  if (!body || !supCurDevice) return;
-  inp.value = '';
-  fetch(BASE + '/support/reply', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ device_id: supCurDevice, body: body })
-  }).then(function(r){return r.json();}).then(function(d){
-    if (d.ok) loadSupportMessages();
-    else alert('发送失败：' + (d.error||''));
-  }).catch(function(){ alert('网络错误'); });
 }
 
 // ── Payment actions ────────────────────────────────────

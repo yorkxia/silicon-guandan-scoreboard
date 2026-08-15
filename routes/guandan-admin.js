@@ -278,6 +278,14 @@ router.post('/billing', requireSbAdmin, async (req, res) => {
 });
 
 // ══════════ 客服交流（用户 ↔ 管理员）══════════
+// GET /support — 客服交流独立页面（侧边栏入口，放在「区域管理」下面，管理员可见）
+router.get('/support', requireSbAdmin, (req, res) => {
+  res.render('scoreboard/guandan-support', {
+    activePage: 'guandan-support',
+    sbUser: req.session.sbUser
+  });
+});
+
 // GET /support/threads — 会话列表（按设备聚合，含未读数与最后一条）
 router.get('/support/threads', async (req, res) => {
   try {
