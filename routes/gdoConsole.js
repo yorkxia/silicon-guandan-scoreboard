@@ -343,4 +343,67 @@ router.post('/cleanup', async (req, res) => {
   }
 });
 
+/* ════════════ 🤖 机器人测试系统：读写 gd_settings 开关 + 展示状态（游戏服 botRunner 每 20s 轮询生效）════════════ */
+async function botGet(k, dflt) {
+  try { const r = await query('SELECT sval FROM gd_settings WHERE skey=$1', [k]); return (r.length && r[0].sval != null) ? r[0].sval : dflt; }
+  catch (e) { return dflt; }
+}
+async function botSet(k, v) {
+  await query(`INSERT INTO gd_settings(skey,sval,updated_at) VALUES($1,$2,NOW())
+               ON CONFLICT (skey) DO UPDATE SET sval=$2, updated_at=NOW()`, [k, String(v)]);
+}
+/* 可选：配了 GAME_BASE_URL(或 BOT_TICK_URL)+BOT_TICK_KEY 时，best-effort 通知游戏服立即唤醒并生效 */
+async function nudgeGame() {
+  try {
+    const base = process.env.GAME_BASE_URL || process.env.BOT_TICK_URL;
+    const key  = process.env.BOT_TICK_KEY  || process.env.BOT_SECRET;
+    if (!base || typeof fetch !== 'function') return;
+    await fetch(base.replace(/\/$/, '') + '/internal/bot-tick?key=' + encodeURIComponent(key || ''), { method: 'GET' }).catch(() => {});
+  } catch (e) {}
+}
+
+router.get('/bots', async (req, res) => {
+  try {
+    const [enabled, cEnabled, cMonths, statusRaw, cleanTs] = await Promise.all([
+      botGet('bot_sim_enabled', '0'), botGet('bot_sim_cleanup_enabled', '0'),
+      botGet('bot_sim_cleanup_months', '2'), botGet('bot_sim_status', ''),
+      botGet('bot_sim_cleanup_last_ts', '')
+    ]);
+    let status = null; try { status = statusRaw ? JSON.parse(statusRaw) : null; } catch (e) {}
+    res.render('scoreboard/gdo-bots', {
+      activePage: 'gdo-bots', sbUser: req.session.sbUser,
+      enabled: enabled === '1', cleanupEnabled: cEnabled === '1',
+      cleanupMonths: parseInt(cMonths, 10) || 2, status, cleanupLast: cleanTs ? Number(cleanTs) : 0
+    });
+  } catch (e) { res.status(500).send('机器人页面加载失败：' + e.message); }
+});
+
+router.get('/bots/status', async (req, res) => {
+  try {
+    const raw = await botGet('bot_sim_status', '');
+    let status = null; try { status = raw ? JSON.parse(raw) : null; } catch (e) {}
+    res.json({ ok: true, enabled: (await botGet('bot_sim_enabled', '0')) === '1', status });
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
+router.post('/bots/toggle', express.json(), async (req, res) => {
+  try {
+    const on = !!(req.body && req.body.enabled);
+    await botSet('bot_sim_enabled', on ? '1' : '0');
+    nudgeGame();
+    res.json({ ok: true, enabled: on });
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
+router.post('/bots/cleanup-config', express.json(), async (req, res) => {
+  try {
+    const on = !!(req.body && req.body.enabled);
+    let months = parseInt(req.body && req.body.months, 10);
+    if (!(months >= 1)) months = 2; if (months > 24) months = 24;
+    await botSet('bot_sim_cleanup_enabled', on ? '1' : '0');
+    await botSet('bot_sim_cleanup_months', String(months));
+    res.json({ ok: true, enabled: on, months });
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
 module.exports = router;

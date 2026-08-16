@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>机器人测试系统 | Guandan Bot Simulator</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/scoreboard-admin.css">
+  <style>
+    .rb-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    @media (max-width:1000px){ .rb-grid { grid-template-columns:1fr; } }
+    .rb-card { background:#161616; border:1px solid #2c2c2c; border-radius:14px; padding:20px 22px; margin-bottom:20px; }
+    .rb-card h3 { margin:0 0 6px; font-size:1.05rem; color:#D4AC0D; font-weight:800; }
+    .rb-card p.sub { margin:0 0 16px; font-size:.82rem; color:#8a8a8a; line-height:1.6; }
+    .rb-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+    @media (max-width:700px){ .rb-kpis { grid-template-columns:repeat(2,1fr); } }
+    .rb-kpi { background:#111; border:1px solid #2c2c2c; border-radius:10px; padding:14px 8px; text-align:center; }
+    .rb-kpi b { display:block; font-size:1.5rem; color:#fff; }
+    .rb-kpi span { font-size:.72rem; color:#888; }
+    .rb-badge { display:inline-flex; align-items:center; gap:7px; padding:6px 14px; border-radius:20px; font-weight:800; font-size:.9rem; }
+    .rb-on  { background:rgba(39,174,96,.16); color:#4ade80; border:1px solid rgba(39,174,96,.4); }
+    .rb-off { background:rgba(160,160,160,.12); color:#aaa; border:1px solid #444; }
+    .rb-dot { width:9px; height:9px; border-radius:50%; }
+    .rb-dot.on { background:#22c55e; box-shadow:0 0 8px #22c55e; animation:rbp 1.8s infinite; }
+    .rb-dot.off{ background:#777; }
+    @keyframes rbp { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .rb-btn { border:none; border-radius:10px; padding:11px 22px; font-weight:800; font-size:.92rem; cursor:pointer; letter-spacing:1px; }
+    .rb-btn-go   { background:linear-gradient(135deg,#27AE60,#1A7A40); color:#fff; }
+    .rb-btn-stop { background:linear-gradient(135deg,#C0000F,#8B0000); color:#fff; }
+    .rb-btn:disabled { opacity:.5; cursor:not-allowed; }
+    .rb-row { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+    .rb-group { background:#111; border:1px solid #2c2c2c; border-radius:10px; padding:12px 14px; font-size:.85rem; color:#ccc; margin-top:10px; }
+    .rb-err { margin-top:14px; padding:12px 14px; border-radius:10px; background:rgba(192,0,15,.1); border:1px solid rgba(192,0,15,.35); color:#ff9b9b; font-size:.82rem; word-break:break-all; }
+    .rb-note { margin-top:16px; padding:14px 16px; border-radius:10px; background:rgba(212,172,13,.07); border:1px solid rgba(212,172,13,.28); color:#c9b26a; font-size:.8rem; line-height:1.85; }
+    .rb-inp { width:70px; background:#0e0e0e; border:1px solid #333; color:#fff; border-radius:8px; padding:8px 10px; font-size:.9rem; }
+    .rb-switch { position:relative; display:inline-block; width:52px; height:28px; }
+    .rb-switch input { display:none; }
+    .rb-sl { position:absolute; inset:0; background:#444; border-radius:28px; transition:.2s; cursor:pointer; }
+    .rb-sl::before { content:''; position:absolute; width:22px; height:22px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
+    .rb-switch input:checked + .rb-sl { background:#27AE60; }
+    .rb-switch input:checked + .rb-sl::before { transform:translateX(24px); }
+  </style>
+</head>
+<body>
+<% const activePage = 'gdo-bots'; %>
+<div class="sb-wrap">
+  <%- include('_layout', { activePage }) %>
+  <main class="sb-main">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:6px;">
+      <h1 style="margin:0; font-size:1.4rem;">🤖 机器人测试系统</h1>
+      <div id="rb-live" style="font-size:.75rem; color:#666;">加载中…</div>
+    </div>
+    <p style="margin:0 0 20px; color:#8a8a8a; font-size:.85rem; line-height:1.7;">
+      两组共 20 个机器人（每组 4人桌×1 + 6人桌×1）24 小时接力，在 4人/6人赛事大厅持续对局：
+      让真人可无感接手托管座直接进大屏，同时持续端到端测试，出问题自动写入「客服交流」通知你。
+    </p>
+
+    <!-- 主开关 + 实时状态 -->
+    <div class="rb-card">
+      <div class="rb-row" style="justify-content:space-between;">
+        <div class="rb-row">
+          <span id="rb-badge" class="rb-badge <%= enabled ? 'rb-on' : 'rb-off' %>">
+            <span id="rb-dot" class="rb-dot <%= enabled ? 'on' : 'off' %>"></span>
+            <span id="rb-badge-txt"><%= enabled ? '运行中' : '已停止' %></span>
+          </span>
+          <span id="rb-since" style="font-size:.78rem; color:#777;"></span>
+        </div>
+        <div class="rb-row">
+          <button id="rb-start" class="rb-btn rb-btn-go"   onclick="rbToggle(true)"  <%= enabled ? 'disabled' : '' %>>▶ 启动</button>
+          <button id="rb-stop"  class="rb-btn rb-btn-stop" onclick="rbToggle(false)" <%= enabled ? '' : 'disabled' %>>■ 停止</button>
+        </div>
+      </div>
+
+      <div class="rb-kpis" style="margin-top:18px;">
+        <div class="rb-kpi"><b id="rb-bots">–</b><span>在线机器人</span></div>
+        <div class="rb-kpi"><b id="rb-rooms">–</b><span>活跃房间</span></div>
+        <div class="rb-kpi"><b id="rb-groups">–</b><span>运行分组</span></div>
+        <div class="rb-kpi"><b id="rb-updated">–</b><span>状态更新</span></div>
+      </div>
+      <div id="rb-group-list"></div>
+      <div id="rb-err" class="rb-err" style="display:none;"></div>
+    </div>
+
+    <div class="rb-grid">
+      <!-- 每日自动清理 -->
+      <div class="rb-card">
+        <h3>🧹 每日自动清理数据</h3>
+        <p class="sub">机器人 24h 不停打会产生大量对局数据。开启后每天自动清理一次「绿灯表」（已结束的老房间/瞬态队列/访问日志），红线表（积分/报名/付款/账号/配置）绝不触碰。</p>
+        <div class="rb-row" style="justify-content:space-between;">
+          <label class="rb-switch"><input type="checkbox" id="rb-clean" <%= cleanupEnabled ? 'checked' : '' %>><span class="rb-sl"></span></label>
+          <div class="rb-row">
+            <span style="font-size:.85rem; color:#bbb;">保留最近</span>
+            <input type="number" id="rb-months" class="rb-inp" min="1" max="24" value="<%= cleanupMonths %>">
+            <span style="font-size:.85rem; color:#bbb;">个月</span>
+            <button class="rb-btn" style="background:#D4AC0D; color:#1a0a00;" onclick="rbSaveCleanup()">保存</button>
+          </div>
+        </div>
+        <div id="rb-clean-last" style="margin-top:12px; font-size:.78rem; color:#777;">
+          <% if (cleanupLast) { %>上次清理：<%= new Date(cleanupLast).toLocaleString('zh-CN') %><% } else { %>尚未执行过自动清理<% } %>
+        </div>
+        <div id="rb-clean-msg" style="margin-top:8px; font-size:.8rem; color:#4ade80;"></div>
+      </div>
+
+      <!-- 说明 / 保活提醒 -->
+      <div class="rb-card">
+        <h3>⚙️ 运行说明 · 保持 Render 唤醒</h3>
+        <div class="rb-note" style="margin-top:0;">
+          ⚠️ <b>机器人本身唤不醒睡着的 Render 免费实例</b>（休眠时容器停掉，内部定时器也停）。要真正 24h 不休眠，必须靠<b>外部定时访问</b>：<br>
+          本仓库已附带 <code>.github/workflows/keepalive.yml</code>，每 10 分钟从 GitHub 外部 ping 一次游戏服，既保活又自愈机器人。<br>
+          需在<b>游戏服仓库</b> Settings → Secrets 配置 <code>BOT_TICK_KEY</code>（与游戏服环境变量一致）。<br>
+          或直接把游戏服升级 Render Starter（$7/月）永不休眠，最省心。
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+var rbBusy = false;
+function rbToggle(on){
+  if (rbBusy) return; rbBusy = true;
+  fetch('/scoreboard/gdo/bots/toggle', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ enabled: on }) })
+    .then(r=>r.json()).then(function(){ rbBusy=false; setTimeout(rbRefresh, 400); })
+    .catch(function(){ rbBusy=false; });
+}
+function rbSaveCleanup(){
+  var on = document.getElementById('rb-clean').checked;
+  var months = parseInt(document.getElementById('rb-months').value,10) || 2;
+  fetch('/scoreboard/gdo/bots/cleanup-config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ enabled:on, months:months }) })
+    .then(r=>r.json()).then(function(d){
+      var m = document.getElementById('rb-clean-msg');
+      m.textContent = d.ok ? ('✅ 已保存：'+(d.enabled?'开启':'关闭')+' · 保留 '+d.months+' 个月') : ('保存失败：'+(d.error||''));
+      setTimeout(function(){ m.textContent=''; }, 3000);
+    });
+}
+function rbFmtAgo(ts){
+  if (!ts) return '–';
+  var s = Math.round((Date.now()-ts)/1000);
+  if (s < 60) return s+'秒前';
+  if (s < 3600) return Math.round(s/60)+'分钟前';
+  return Math.round(s/3600)+'小时前';
+}
+function rbRefresh(){
+  fetch('/scoreboard/gdo/bots/status').then(r=>r.json()).then(function(d){
+    document.getElementById('rb-live').textContent = '每 10 秒自动刷新 · ' + new Date().toLocaleTimeString('zh-CN');
+    var on = !!d.enabled;
+    var badge = document.getElementById('rb-badge'), dot = document.getElementById('rb-dot');
+    badge.className = 'rb-badge ' + (on?'rb-on':'rb-off');
+    dot.className = 'rb-dot ' + (on?'on':'off');
+    document.getElementById('rb-badge-txt').textContent = on ? '运行中' : '已停止';
+    document.getElementById('rb-start').disabled = on;
+    document.getElementById('rb-stop').disabled  = !on;
+    var s = d.status || {};
+    document.getElementById('rb-bots').textContent    = (s.botsTotal!=null)? s.botsTotal : (on?'…':'0');
+    document.getElementById('rb-rooms').textContent   = (s.roomsActive!=null)? s.roomsActive : '0';
+    var groups = s.groups || {};
+    document.getElementById('rb-groups').textContent  = Object.keys(groups).length;
+    document.getElementById('rb-updated').textContent = rbFmtAgo(s.ts);
+    document.getElementById('rb-since').textContent   = (on && s.startedAt) ? ('已运行 '+rbFmtAgo(s.startedAt).replace('前','')) : '';
+    var gl = document.getElementById('rb-group-list'); gl.innerHTML='';
+    Object.keys(groups).forEach(function(gid){
+      var g = groups[gid];
+      var el = document.createElement('div'); el.className='rb-group';
+      el.innerHTML = '组 <b style="color:#D4AC0D">'+gid+'</b> · 机器人 '+g.bots+' · 出牌中 '+(g.playing||0)+' · 已运行 '+(g.ageMin||0)+' 分钟';
+      gl.appendChild(el);
+    });
+    var err = document.getElementById('rb-err');
+    if (s.lastError){ err.style.display='block'; err.textContent='最近异常：'+s.lastError; }
+    else err.style.display='none';
+    if (!on && !s.botsTotal){ document.getElementById('rb-bots').textContent='0'; }
+  }).catch(function(){ document.getElementById('rb-live').textContent='状态获取失败'; });
+}
+rbRefresh();
+setInterval(rbRefresh, 10000);
+</script>
+</body>
+</html>
