@@ -42,6 +42,10 @@ app.use('/scoreboard/intelligence', intelligenceRoutes);
 app.use('/scoreboard/guandan-admin', guandanAdminRoutes);
 app.use('/scoreboard/gdo', gdoConsoleRoutes);
 
+// 保活健康检查：不查库、不走登录，供外部定时器(GitHub Actions / cron-job.org 等)每 ≤5 分钟访问一次，
+// 让 Render 免费实例保持唤醒不休眠。返回极简 200，开销可忽略。
+app.get('/healthz', (req, res) => res.json({ ok: true, service: 'scoreboard', ts: Date.now() }));
+
 app.get('/', (req, res) => res.redirect('/scoreboard/login'));
 app.use((req, res) => res.redirect('/scoreboard/login'));
 
